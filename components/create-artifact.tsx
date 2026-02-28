@@ -47,6 +47,7 @@ type ArtifactContent<M = any> = {
   isLoading: boolean;
   metadata: M;
   setMetadata: Dispatch<SetStateAction<M>>;
+  sendMessage?: UseChatHelpers<ChatMessage>["sendMessage"];
 };
 
 type InitializeParameters<M = any> = {

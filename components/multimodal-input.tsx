@@ -297,6 +297,7 @@ function PureMultimodalInput({
 
   return (
     <div className={cn("relative flex w-full flex-col gap-4", className)}>
+      {/* Suggested actions hidden for dating matchmaker
       {messages.length === 0 &&
         attachments.length === 0 &&
         uploadQueue.length === 0 && (
@@ -306,6 +307,7 @@ function PureMultimodalInput({
             sendMessage={sendMessage}
           />
         )}
+      */}
 
       <input
         className="pointer-events-none fixed -top-4 -left-4 size-0.5 opacity-0"

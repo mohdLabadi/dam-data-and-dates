@@ -4,6 +4,10 @@ import { deleteAllChatsByUserId, getChatsByUserId } from "@/lib/db/queries";
 import { ChatbotError } from "@/lib/errors";
 
 export async function GET(request: NextRequest) {
+  if (!process.env.POSTGRES_URL) {
+    return Response.json({ chats: [], hasMore: false });
+  }
+
   const { searchParams } = request.nextUrl;
 
   const limit = Number.parseInt(searchParams.get("limit") || "10", 10);
@@ -34,6 +38,10 @@ export async function GET(request: NextRequest) {
 }
 
 export async function DELETE() {
+  if (!process.env.POSTGRES_URL) {
+    return Response.json({ deleted: false, reason: "database_not_configured" });
+  }
+
   const session = await auth();
 
   if (!session?.user) {

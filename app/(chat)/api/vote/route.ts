@@ -3,6 +3,10 @@ import { getChatById, getVotesByChatId, voteMessage } from "@/lib/db/queries";
 import { ChatbotError } from "@/lib/errors";
 
 export async function GET(request: Request) {
+  if (!process.env.POSTGRES_URL) {
+    return Response.json([], { status: 200 });
+  }
+
   const { searchParams } = new URL(request.url);
   const chatId = searchParams.get("chatId");
 
