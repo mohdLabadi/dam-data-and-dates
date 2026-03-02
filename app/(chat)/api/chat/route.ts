@@ -11,6 +11,7 @@ import { after } from "next/server";
 import { createResumableStreamContext } from "resumable-stream";
 import { auth, type UserType } from "@/app/(auth)/auth";
 import { entitlementsByUserType } from "@/lib/ai/entitlements";
+import { resolveChatModelId } from "@/lib/ai/models";
 import { type RequestHints, systemPrompt } from "@/lib/ai/prompts";
 import { getLanguageModel } from "@/lib/ai/providers";
 import { createDocument } from "@/lib/ai/tools/create-document";
@@ -38,6 +39,58 @@ import { generateTitleFromUserMessage } from "../../actions";
 import { type PostRequestBody, postRequestBodySchema } from "./schema";
 
 export const maxDuration = 60;
+const EMPTY_ASSISTANT_FALLBACK_TEXT =
+  "The AI provider is currently quota-limited. Add billing/credits, use another API key, or switch provider and try again.";
+
+function hasVisibleAssistantContent(message: ChatMessage) {
+  return message.parts.some((part) => {
+    if (part.type === "text") {
+      return part.text?.trim().length > 0;
+    }
+
+    if (part.type === "reasoning") {
+      return part.text?.trim().length > 0;
+    }
+
+    return part.type.startsWith("tool-");
+  });
+}
+
+function normalizeAssistantMessage(message: ChatMessage): ChatMessage {
+  if (message.role !== "assistant" || hasVisibleAssistantContent(message)) {
+    return message;
+  }
+
+  return {
+    ...message,
+    parts: [
+      ...message.parts,
+      {
+        type: "text",
+        text: EMPTY_ASSISTANT_FALLBACK_TEXT,
+      },
+    ],
+  };
+}
+
+function getStreamErrorMessage(error: unknown) {
+  if (!(error instanceof Error)) {
+    return "I ran into an unexpected issue. Please try again.";
+  }
+
+  const message = error.message?.toLowerCase() ?? "";
+
+  if (
+    message.includes("quota") ||
+    message.includes("resource_exhausted") ||
+    message.includes("statuscode: 429") ||
+    message.includes("rate limit")
+  ) {
+    return "I hit the provider quota/rate limit. Please wait a bit and try again, or switch to another model/provider.";
+  }
+
+  return "I couldn't generate a response right now. Please try again.";
+}
 
 function getStreamContext() {
   try {
@@ -48,6 +101,13 @@ function getStreamContext() {
 }
 
 export { getStreamContext };
+
+type ActiveToolName =
+  | "getWeather"
+  | "createDocument"
+  | "updateDocument"
+  | "requestSuggestions"
+  | "generateProfiles";
 
 export async function POST(request: Request) {
   let requestBody: PostRequestBody;
@@ -63,6 +123,7 @@ export async function POST(request: Request) {
   try {
     const { id, message, messages, selectedChatModel, selectedVisibilityType } =
       requestBody;
+    const resolvedChatModel = resolveChatModelId(selectedChatModel);
 
     const session = await auth();
 
@@ -141,30 +202,30 @@ export async function POST(request: Request) {
     }
 
     const isReasoningModel =
-      selectedChatModel.includes("reasoning") ||
-      selectedChatModel.includes("thinking");
+      resolvedChatModel.includes("reasoning") ||
+      resolvedChatModel.includes("thinking");
 
     const modelMessages = await convertToModelMessages(uiMessages);
+    const activeTools: ActiveToolName[] = isReasoningModel
+      ? []
+      : [
+          "getWeather",
+          "createDocument",
+          "updateDocument",
+          "requestSuggestions",
+          ...(modelMessages.length >= 3 ? (["generateProfiles"] as const) : []),
+        ];
 
     const stream = createUIMessageStream({
       originalMessages: isToolApprovalFlow ? uiMessages : undefined,
       execute: async ({ writer: dataStream }) => {
         const result = streamText({
-          model: getLanguageModel(selectedChatModel),
-          system: systemPrompt({ selectedChatModel, requestHints }),
+          model: getLanguageModel(resolvedChatModel),
+          maxRetries: 0,
+          system: systemPrompt({ selectedChatModel: resolvedChatModel, requestHints }),
           messages: modelMessages,
           stopWhen: stepCountIs(5),
-          experimental_activeTools: isReasoningModel
-            ? []
-            : [
-                "getWeather",
-                "createDocument",
-                "updateDocument",
-                "requestSuggestions",
-                // Only enable profile generation after at least one full exchange
-                // (prevents the model from calling it immediately on "hello")
-                ...(modelMessages.length >= 3 ? ["generateProfiles"] : []),
-              ],
+          experimental_activeTools: activeTools,
           providerOptions: isReasoningModel
             ? {
                 anthropic: {
@@ -197,12 +258,16 @@ export async function POST(request: Request) {
       },
       generateId: generateUUID,
       onFinish: async ({ messages: finishedMessages }) => {
+        const normalizedFinishedMessages = finishedMessages.map((message) =>
+          normalizeAssistantMessage(message as ChatMessage)
+        );
+
         if (!hasDatabase) {
           return;
         }
 
         if (isToolApprovalFlow) {
-          for (const finishedMsg of finishedMessages) {
+          for (const finishedMsg of normalizedFinishedMessages) {
             const existingMsg = uiMessages.find((m) => m.id === finishedMsg.id);
             if (existingMsg) {
               await updateMessage({
@@ -224,9 +289,9 @@ export async function POST(request: Request) {
               });
             }
           }
-        } else if (finishedMessages.length > 0) {
+        } else if (normalizedFinishedMessages.length > 0) {
           await saveMessages({
-            messages: finishedMessages.map((currentMessage) => ({
+            messages: normalizedFinishedMessages.map((currentMessage) => ({
               id: currentMessage.id,
               role: currentMessage.role,
               parts: currentMessage.parts,
@@ -237,7 +302,7 @@ export async function POST(request: Request) {
           });
         }
       },
-      onError: () => "Oops, an error occurred!",
+      onError: (error) => getStreamErrorMessage(error),
     });
 
     return createUIMessageStreamResponse({

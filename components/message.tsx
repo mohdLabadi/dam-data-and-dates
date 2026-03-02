@@ -23,6 +23,9 @@ import { MessageReasoning } from "./message-reasoning";
 import { PreviewAttachment } from "./preview-attachment";
 import { Weather } from "./weather";
 
+const EMPTY_ASSISTANT_FALLBACK_TEXT =
+  "The AI provider is currently quota-limited. Add billing/credits, use another API key, or switch provider and try again.";
+
 const PurePreviewMessage = ({
   addToolApprovalResponse,
   chatId,
@@ -47,8 +50,21 @@ const PurePreviewMessage = ({
   const [mode, setMode] = useState<"view" | "edit">("view");
 
   const attachmentsFromMessage = message.parts.filter(
-    (part) => part.type === "file"
+    (part) => part.type === "file",
   );
+  const hasVisibleAssistantContent =
+    message.role === "assistant" &&
+    message.parts.some((part) => {
+      if (part.type === "text") {
+        return part.text?.trim().length > 0;
+      }
+
+      if (part.type === "reasoning") {
+        return part.text?.trim().length > 0;
+      }
+
+      return part.type.startsWith("tool-");
+    });
 
   useDataStream();
 
@@ -73,12 +89,12 @@ const PurePreviewMessage = ({
         <div
           className={cn("flex flex-col", {
             "gap-2 md:gap-4": message.parts?.some(
-              (p) => p.type === "text" && p.text?.trim()
+              (p) => p.type === "text" && p.text?.trim(),
             ),
             "w-full":
               (message.role === "assistant" &&
                 (message.parts?.some(
-                  (p) => p.type === "text" && p.text?.trim()
+                  (p) => p.type === "text" && p.text?.trim(),
                 ) ||
                   message.parts?.some((p) => p.type.startsWith("tool-")))) ||
               mode === "edit",
@@ -344,6 +360,19 @@ const PurePreviewMessage = ({
 
             return null;
           })}
+
+          {message.role === "assistant" &&
+            !isLoading &&
+            !hasVisibleAssistantContent && (
+              <div>
+                <MessageContent
+                  className="bg-transparent px-0 py-0 text-left"
+                  data-testid="message-content"
+                >
+                  <Response>{EMPTY_ASSISTANT_FALLBACK_TEXT}</Response>
+                </MessageContent>
+              </div>
+            )}
 
           {!isReadonly && (
             <MessageActions

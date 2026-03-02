@@ -1,5 +1,7 @@
 // Curated list of top models from Vercel AI Gateway
 export const DEFAULT_CHAT_MODEL = "google/gemini-2.5-flash-lite";
+export const GOOGLE_MODEL_QUOTA_EXHAUSTED = "google/gemini-2.5-flash-lite";
+export const GOOGLE_MODEL_FALLBACK = "google/gemini-2.5-flash-lite";
 
 export type ChatModel = {
   id: string;
@@ -94,3 +96,21 @@ export const modelsByProvider = chatModels.reduce(
   },
   {} as Record<string, ChatModel[]>
 );
+
+export function resolveChatModelId(modelId?: string) {
+  if (!modelId) {
+    return GOOGLE_MODEL_FALLBACK;
+  }
+
+  if (modelId === GOOGLE_MODEL_QUOTA_EXHAUSTED) {
+    return GOOGLE_MODEL_FALLBACK;
+  }
+
+  const isKnownModel = chatModels.some((model) => model.id === modelId);
+
+  if (!isKnownModel) {
+    return GOOGLE_MODEL_FALLBACK;
+  }
+
+  return modelId;
+}

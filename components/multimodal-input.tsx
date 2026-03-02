@@ -118,7 +118,7 @@ function PureMultimodalInput({
 
   const [localStorageInput, setLocalStorageInput] = useLocalStorage(
     "input",
-    ""
+    "",
   );
 
   useEffect(() => {
@@ -220,7 +220,7 @@ function PureMultimodalInput({
         const uploadPromises = files.map((file) => uploadFile(file));
         const uploadedAttachments = await Promise.all(uploadPromises);
         const successfullyUploadedAttachments = uploadedAttachments.filter(
-          (attachment) => attachment !== undefined
+          (attachment) => attachment !== undefined,
         );
 
         setAttachments((currentAttachments) => [
@@ -233,7 +233,7 @@ function PureMultimodalInput({
         setUploadQueue([]);
       }
     },
-    [setAttachments, uploadFile]
+    [setAttachments, uploadFile],
   );
 
   const handlePaste = useCallback(
@@ -244,7 +244,7 @@ function PureMultimodalInput({
       }
 
       const imageItems = Array.from(items).filter((item) =>
-        item.type.startsWith("image/")
+        item.type.startsWith("image/"),
       );
 
       if (imageItems.length === 0) {
@@ -267,7 +267,7 @@ function PureMultimodalInput({
           (attachment) =>
             attachment !== undefined &&
             attachment.url !== undefined &&
-            attachment.contentType !== undefined
+            attachment.contentType !== undefined,
         );
 
         setAttachments((curr) => [
@@ -281,7 +281,7 @@ function PureMultimodalInput({
         setUploadQueue([]);
       }
     },
-    [setAttachments, uploadFile]
+    [setAttachments, uploadFile],
   );
 
   // Add paste event listener to textarea
@@ -326,10 +326,14 @@ function PureMultimodalInput({
             return;
           }
           if (status !== "ready") {
-            toast.error("Please wait for the model to finish its response!");
-          } else {
-            submitForm();
+            stop();
+            setTimeout(() => {
+              submitForm();
+            }, 0);
+            return;
           }
+
+          submitForm();
         }}
       >
         {(attachments.length > 0 || uploadQueue.length > 0) && (
@@ -343,7 +347,7 @@ function PureMultimodalInput({
                 key={attachment.url}
                 onRemove={() => {
                   setAttachments((currentAttachments) =>
-                    currentAttachments.filter((a) => a.url !== attachment.url)
+                    currentAttachments.filter((a) => a.url !== attachment.url),
                   );
                   if (fileInputRef.current) {
                     fileInputRef.current.value = "";
@@ -392,7 +396,7 @@ function PureMultimodalInput({
             />
           </PromptInputTools>
 
-          {status === "submitted" ? (
+          {status !== "ready" ? (
             <StopButton setMessages={setMessages} stop={stop} />
           ) : (
             <PromptInputSubmit
@@ -430,7 +434,7 @@ export const MultimodalInput = memo(
     }
 
     return true;
-  }
+  },
 );
 
 function PureAttachmentsButton({
@@ -525,7 +529,7 @@ function PureModelSelectorCompact({
                   );
                 })}
               </ModelSelectorGroup>
-            )
+            ),
           )}
         </ModelSelectorList>
       </ModelSelectorContent>
