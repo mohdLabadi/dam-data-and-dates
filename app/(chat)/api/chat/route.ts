@@ -102,12 +102,78 @@ function getStreamContext() {
 
 export { getStreamContext };
 
+function isToolApprovalFlowMessageSet(messages?: ChatMessage[]) {
+  if (!messages || messages.length === 0) {
+    return false;
+  }
+
+  return messages.some((msg) =>
+    msg.parts?.some((part) => {
+      const state = (part as { state?: string }).state;
+      return state === "approval-responded" || state === "output-denied";
+    })
+  );
+}
+
 type ActiveToolName =
   | "getWeather"
   | "createDocument"
   | "updateDocument"
   | "requestSuggestions"
   | "generateProfiles";
+
+function getUserTextFromMessages(messages: ChatMessage[]) {
+  return messages
+    .filter((m) => m.role === "user")
+    .flatMap((m) => m.parts)
+    .filter((part): part is Extract<ChatMessage["parts"][number], { type: "text" }> =>
+      part.type === "text"
+    )
+    .map((part) => part.text)
+    .filter((text): text is string => Boolean(text && text.trim().length > 0));
+}
+
+function buildMatchmakingRuntimeGuidance({
+  uiMessages,
+  canUseTools,
+}: {
+  uiMessages: ChatMessage[];
+  canUseTools: boolean;
+}) {
+  const userTexts = getUserTextFromMessages(uiMessages);
+
+  if (userTexts.length === 0) {
+    return "";
+  }
+
+  const conversation = userTexts.join("\n").toLowerCase();
+  const hasRelationshipGoal =
+    /\b(friendship|platonic|serious|committed|casual|marriage|open|exploring|long[-\s]?term)\b/.test(
+      conversation
+    );
+  const asksForMatches =
+    /\b(matches|matchmaking|potential matches|generate profiles|show me matches|find me matches)\b/.test(
+      conversation
+    );
+  const hasTraitsOrValues =
+    /\b(i value|qualities|kindness|kind|friendly|friendliness|values|personality|looking for)\b/.test(
+      conversation
+    );
+
+  const hasEnoughContext =
+    hasRelationshipGoal &&
+    (asksForMatches || hasTraitsOrValues || userTexts.length >= 4);
+
+  if (!canUseTools && hasEnoughContext) {
+    return `\n\nRuntime conversation guidance:\n- Do not repeat opening questions.\n- The user has already provided enough direction to continue.\n- Briefly acknowledge their preferences and ask ONE new, non-redundant question that adds missing details.`;
+  }
+
+  if (!hasEnoughContext) {
+    return "";
+  }
+
+  return `\n\nRuntime conversation guidance:\n- The user has already shared relationship intent and meaningful preferences.\n- Do NOT ask again what kind of connection they are looking for.\n- Use best-effort inference for missing fields and call generateProfiles now.`;
+}
 
 export async function POST(request: Request) {
   let requestBody: PostRequestBody;
@@ -144,7 +210,10 @@ export async function POST(request: Request) {
       return new ChatbotError("rate_limit:chat").toResponse();
     }
 
-    const isToolApprovalFlow = Boolean(messages);
+    const incomingMessages = Array.isArray(messages)
+      ? (messages as ChatMessage[])
+      : undefined;
+    const isToolApprovalFlow = isToolApprovalFlowMessageSet(incomingMessages);
 
     const chat = hasDatabase ? await getChatById({ id }) : null;
     let messagesFromDb: DBMessage[] = [];
@@ -171,9 +240,12 @@ export async function POST(request: Request) {
         : null;
     }
 
-    const uiMessages = isToolApprovalFlow
-      ? (messages as ChatMessage[])
-      : [...convertToUIMessages(messagesFromDb), message as ChatMessage];
+    const uiMessages =
+      !hasDatabase && incomingMessages?.length
+        ? incomingMessages
+        : isToolApprovalFlow
+          ? (incomingMessages ?? [])
+          : [...convertToUIMessages(messagesFromDb), message as ChatMessage];
 
     const { longitude, latitude, city, country } = geolocation(request);
 
@@ -216,13 +288,18 @@ export async function POST(request: Request) {
           ...(modelMessages.length >= 3 ? (["generateProfiles"] as const) : []),
         ];
 
+    const runtimeGuidance = buildMatchmakingRuntimeGuidance({
+      uiMessages,
+      canUseTools: !isReasoningModel,
+    });
+
     const stream = createUIMessageStream({
       originalMessages: isToolApprovalFlow ? uiMessages : undefined,
       execute: async ({ writer: dataStream }) => {
         const result = streamText({
           model: getLanguageModel(resolvedChatModel),
           maxRetries: 0,
-          system: systemPrompt({ selectedChatModel: resolvedChatModel, requestHints }),
+          system: `${systemPrompt({ selectedChatModel: resolvedChatModel, requestHints })}${runtimeGuidance}`,
           messages: modelMessages,
           stopWhen: stepCountIs(5),
           experimental_activeTools: activeTools,
