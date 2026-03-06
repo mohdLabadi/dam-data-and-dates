@@ -1,12 +1,56 @@
 "use client";
 
 import type { UseChatHelpers } from "@ai-sdk/react";
+import { useEffect, useMemo, useState } from "react";
+import { toast } from "sonner";
 import { Artifact } from "@/components/create-artifact";
 import { DocumentSkeleton } from "@/components/document-skeleton";
 import type { PartnerProfile, ProfileSet } from "@/lib/ai/preference-schema";
 import type { ChatMessage } from "@/lib/types";
+import { generateUUID } from "@/lib/utils";
 
-type ProfilesMetadata = Record<string, never>;
+type ProfilesMetadata = {
+  documentId: string;
+};
+
+type SavedMatchRecord = {
+  id: string;
+  createdAt: string;
+  userId: string;
+  documentId: string;
+  profileId: string;
+  profile: PartnerProfile;
+};
+
+const SAVED_MATCHES_STORAGE_KEY = "dam-saved-matches";
+
+function readSavedMatchesFromLocalStorage() {
+  if (typeof window === "undefined") {
+    return [] as SavedMatchRecord[];
+  }
+
+  try {
+    const raw = window.localStorage.getItem(SAVED_MATCHES_STORAGE_KEY);
+
+    if (!raw) {
+      return [] as SavedMatchRecord[];
+    }
+
+    const parsed = JSON.parse(raw) as SavedMatchRecord[];
+
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [] as SavedMatchRecord[];
+  }
+}
+
+function writeSavedMatchesToLocalStorage(matches: SavedMatchRecord[]) {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  window.localStorage.setItem(SAVED_MATCHES_STORAGE_KEY, JSON.stringify(matches));
+}
 
 const profileTypeConfig = {
   close_match: {
@@ -31,10 +75,20 @@ const profileTypeConfig = {
 
 function ProfileCard({
   profile,
+  onSave,
+  onRemove,
+  isSaved,
+  isSaving,
+  isRemoving,
   onLike,
   onDislike,
 }: {
   profile: PartnerProfile;
+  onSave?: (profile: PartnerProfile) => void;
+  onRemove?: () => void;
+  isSaved?: boolean;
+  isSaving?: boolean;
+  isRemoving?: boolean;
   onLike: (profile: PartnerProfile) => void;
   onDislike: (profile: PartnerProfile) => void;
 }) {
@@ -129,22 +183,46 @@ function ProfileCard({
           </div>
         </div>
 
-        {/* Feedback Buttons */}
-        <div className="flex justify-end gap-2">
-          <button
-            className="flex items-center gap-1.5 rounded-full border border-zinc-200 bg-white px-4 py-1.5 text-sm font-medium text-zinc-700 transition-colors hover:border-red-300 hover:bg-red-50 hover:text-red-600 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:border-red-700 dark:hover:bg-red-900/20 dark:hover:text-red-400"
-            type="button"
-            onClick={() => onDislike(profile)}
-          >
-            👎 Not for me
-          </button>
-          <button
-            className="flex items-center gap-1.5 rounded-full border border-zinc-200 bg-white px-4 py-1.5 text-sm font-medium text-zinc-700 transition-colors hover:border-green-300 hover:bg-green-50 hover:text-green-600 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:border-green-700 dark:hover:bg-green-900/20 dark:hover:text-green-400"
-            type="button"
-            onClick={() => onLike(profile)}
-          >
-            👍 This is promising
-          </button>
+        {/* Actions */}
+        <div className="flex flex-wrap justify-end gap-2">
+          {onSave ? (
+            <button
+              className="flex items-center gap-1.5 rounded-full border border-zinc-200 bg-white px-4 py-1.5 text-sm font-medium text-zinc-700 transition-colors hover:border-amber-300 hover:bg-amber-50 hover:text-amber-700 disabled:cursor-not-allowed disabled:opacity-60 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:border-amber-700 dark:hover:bg-amber-900/20 dark:hover:text-amber-300"
+              disabled={Boolean(isSaved) || Boolean(isSaving)}
+              onClick={() => onSave(profile)}
+              type="button"
+            >
+              {isSaved ? "⭐ Saved" : isSaving ? "Saving..." : "⭐ Save match"}
+            </button>
+          ) : null}
+
+          {onRemove ? (
+            <button
+              className="flex items-center gap-1.5 rounded-full border border-zinc-200 bg-white px-4 py-1.5 text-sm font-medium text-zinc-700 transition-colors hover:border-zinc-400 hover:bg-zinc-100 disabled:cursor-not-allowed disabled:opacity-60 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:border-zinc-500 dark:hover:bg-zinc-700"
+              disabled={Boolean(isRemoving)}
+              onClick={onRemove}
+              type="button"
+            >
+              {isRemoving ? "Removing..." : "Remove"}
+            </button>
+          ) : (
+            <>
+              <button
+                className="flex items-center gap-1.5 rounded-full border border-zinc-200 bg-white px-4 py-1.5 text-sm font-medium text-zinc-700 transition-colors hover:border-red-300 hover:bg-red-50 hover:text-red-600 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:border-red-700 dark:hover:bg-red-900/20 dark:hover:text-red-400"
+                onClick={() => onDislike(profile)}
+                type="button"
+              >
+                👎 Not for me
+              </button>
+              <button
+                className="flex items-center gap-1.5 rounded-full border border-zinc-200 bg-white px-4 py-1.5 text-sm font-medium text-zinc-700 transition-colors hover:border-green-300 hover:bg-green-50 hover:text-green-600 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:border-green-700 dark:hover:bg-green-900/20 dark:hover:text-green-400"
+                onClick={() => onLike(profile)}
+                type="button"
+              >
+                👍 This is promising
+              </button>
+            </>
+          )}
         </div>
       </div>
     </div>
@@ -154,14 +232,63 @@ function ProfileCard({
 function ProfilesContent({
   content,
   isLoading,
+  metadata,
   status,
   sendMessage,
 }: {
   content: string;
   isLoading: boolean;
+  metadata?: ProfilesMetadata | null;
   status: "streaming" | "idle";
   sendMessage?: UseChatHelpers<ChatMessage>["sendMessage"];
 }) {
+  const [activeTab, setActiveTab] = useState<"current" | "saved">("current");
+  const [savedMatches, setSavedMatches] = useState<SavedMatchRecord[]>([]);
+  const [isSavedLoading, setIsSavedLoading] = useState(true);
+  const [savingProfileId, setSavingProfileId] = useState<string | null>(null);
+  const [removingMatchId, setRemovingMatchId] = useState<string | null>(null);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    const loadSavedMatches = async () => {
+      const localMatches = readSavedMatchesFromLocalStorage();
+
+      try {
+        const response = await fetch("/api/matches");
+
+        if (!response.ok) {
+          throw new Error("Failed to fetch saved matches");
+        }
+
+        const matches = (await response.json()) as SavedMatchRecord[];
+
+        if (isMounted) {
+          if (matches.length > 0) {
+            setSavedMatches(matches);
+            writeSavedMatchesToLocalStorage(matches);
+          } else {
+            setSavedMatches(localMatches);
+          }
+        }
+      } catch {
+        if (isMounted) {
+          setSavedMatches(localMatches);
+        }
+      } finally {
+        if (isMounted) {
+          setIsSavedLoading(false);
+        }
+      }
+    };
+
+    loadSavedMatches();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
   if (isLoading || (status === "streaming" && !content)) {
     return (
       <div className="p-6">
@@ -207,14 +334,117 @@ function ProfilesContent({
     );
   }
 
+  const savedProfileKeys = useMemo(() => {
+    return new Set(
+      savedMatches.map((match) => `${match.documentId}:${match.profileId}`)
+    );
+  }, [savedMatches]);
+
+  const handleSaveMatch = async (profile: PartnerProfile) => {
+    if (!metadata?.documentId) {
+      toast.error("Could not save match: missing profile set ID.");
+      return;
+    }
+
+    try {
+      setSavingProfileId(profile.id);
+
+      const response = await fetch("/api/matches", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          documentId: metadata.documentId,
+          profile,
+        }),
+      });
+
+      let saved: SavedMatchRecord;
+
+      if (!response.ok) {
+        saved = {
+          id: generateUUID(),
+          createdAt: new Date().toISOString(),
+          userId: "local",
+          documentId: metadata.documentId,
+          profileId: profile.id,
+          profile,
+        };
+      } else {
+        saved = (await response.json()) as SavedMatchRecord;
+      }
+
+      setSavedMatches((current) => {
+        const alreadySaved = current.some(
+          (item) =>
+            item.documentId === saved.documentId && item.profileId === saved.profileId
+        );
+
+        if (alreadySaved) {
+          return current;
+        }
+
+        const next = [saved, ...current];
+        writeSavedMatchesToLocalStorage(next);
+        return next;
+      });
+
+      toast.success(`${profile.name} saved to your matches.`);
+    } catch {
+      toast.error("Unable to save this match right now.");
+    } finally {
+      setSavingProfileId(null);
+    }
+  };
+
+  const handleRemoveSavedMatch = async (matchId: string) => {
+    try {
+      setRemovingMatchId(matchId);
+
+      const response = await fetch(`/api/matches?id=${matchId}`, {
+        method: "DELETE",
+      });
+
+      setSavedMatches((current) =>
+        {
+          const next = current.filter((match) => match.id !== matchId);
+          writeSavedMatchesToLocalStorage(next);
+          return next;
+        }
+      );
+
+      if (!response.ok) {
+        // localStorage fallback already applied above
+      }
+
+      toast.success("Match removed from saved list.");
+    } catch {
+      // If request itself failed (offline/no route), still remove locally.
+      setSavedMatches((current) => {
+        const next = current.filter((match) => match.id !== matchId);
+        writeSavedMatchesToLocalStorage(next);
+        return next;
+      });
+      toast.success("Match removed from saved list.");
+    } finally {
+      setRemovingMatchId(null);
+    }
+  };
+
   const handleLike = (profile: PartnerProfile) => {
     if (!sendMessage) return;
+
+    const docInstruction = metadata?.documentId
+      ? ` Use updateDocument with id ${metadata.documentId}.`
+      : "";
+
     sendMessage({
       role: "user",
       parts: [
         {
           type: "text",
-          text: `I liked ${profile.name}'s profile (${profile.type.replace("_", " ")}). Their traits that stood out to me: ${profile.traits.slice(0, 3).join(", ")}. Please regenerate all three profiles with more matches like this one.`,
+          text: `I liked ${profile.name}'s profile (${profile.type.replace("_", " ")}). Their traits that stood out to me: ${profile.traits.slice(0, 3).join(", ")}. Please regenerate all three profiles with more matches like this one.${docInstruction}`,
         },
       ],
     });
@@ -222,12 +452,17 @@ function ProfilesContent({
 
   const handleDislike = (profile: PartnerProfile) => {
     if (!sendMessage) return;
+
+    const docInstruction = metadata?.documentId
+      ? ` Use updateDocument with id ${metadata.documentId}.`
+      : "";
+
     sendMessage({
       role: "user",
       parts: [
         {
           type: "text",
-          text: `I didn't connect with ${profile.name}'s profile (${profile.type.replace("_", " ")}). Please regenerate all three profiles and avoid the qualities that made this one feel off.`,
+          text: `I didn't connect with ${profile.name}'s profile (${profile.type.replace("_", " ")}). Please regenerate all three profiles and avoid the qualities that made this one feel off.${docInstruction}`,
         },
       ],
     });
@@ -235,6 +470,58 @@ function ProfilesContent({
 
   return (
     <div className="px-4 py-6 md:px-8">
+      <div className="mb-5 flex items-center gap-2">
+        <button
+          className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${
+            activeTab === "current"
+              ? "bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900"
+              : "bg-zinc-100 text-zinc-700 hover:bg-zinc-200 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700"
+          }`}
+          onClick={() => setActiveTab("current")}
+          type="button"
+        >
+          Current Matches
+        </button>
+        <button
+          className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${
+            activeTab === "saved"
+              ? "bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900"
+              : "bg-zinc-100 text-zinc-700 hover:bg-zinc-200 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700"
+          }`}
+          onClick={() => setActiveTab("saved")}
+          type="button"
+        >
+          Saved ({savedMatches.length})
+        </button>
+      </div>
+
+      {activeTab === "saved" ? (
+        <div>
+          {isSavedLoading ? (
+            <div className="text-sm text-zinc-500 dark:text-zinc-400">
+              Loading saved matches...
+            </div>
+          ) : savedMatches.length === 0 ? (
+            <div className="rounded-xl border border-dashed border-zinc-300 p-4 text-sm text-zinc-500 dark:border-zinc-700 dark:text-zinc-400">
+              You haven&apos;t saved any matches yet. Click "Save match" on a profile to keep it here.
+            </div>
+          ) : (
+            savedMatches.map((savedMatch) => (
+              <ProfileCard
+                key={savedMatch.id}
+                isRemoving={removingMatchId === savedMatch.id}
+                onDislike={() => {}}
+                onLike={() => {}}
+                onRemove={() => handleRemoveSavedMatch(savedMatch.id)}
+                profile={savedMatch.profile}
+              />
+            ))
+          )}
+        </div>
+      ) : null}
+
+      {activeTab === "current" ? (
+        <>
       {profileSet.preferencesSummary && (
         <p className="mb-6 text-sm text-zinc-500 dark:text-zinc-400">
           {profileSet.preferencesSummary}
@@ -242,12 +529,17 @@ function ProfilesContent({
       )}
       {profileSet.profiles.map((profile) => (
         <ProfileCard
+          isSaved={savedProfileKeys.has(`${metadata?.documentId}:${profile.id}`)}
+          isSaving={savingProfileId === profile.id}
           key={profile.id}
           onDislike={handleDislike}
           onLike={handleLike}
+          onSave={handleSaveMatch}
           profile={profile}
         />
       ))}
+        </>
+      ) : null}
     </div>
   );
 }
@@ -255,6 +547,9 @@ function ProfilesContent({
 export const profilesArtifact = new Artifact<"profiles", ProfilesMetadata>({
   kind: "profiles",
   description: "Displays generated romantic partner profiles with feedback.",
+  initialize: ({ documentId, setMetadata }) => {
+    setMetadata({ documentId });
+  },
 
   onStreamPart: ({ streamPart, setArtifact }) => {
     if (streamPart.type === "data-textDelta") {
@@ -270,6 +565,7 @@ export const profilesArtifact = new Artifact<"profiles", ProfilesMetadata>({
   content: ({
     content,
     isLoading,
+    metadata,
     status,
     sendMessage,
   }) => {
@@ -277,6 +573,7 @@ export const profilesArtifact = new Artifact<"profiles", ProfilesMetadata>({
       <ProfilesContent
         content={content}
         isLoading={isLoading}
+        metadata={metadata}
         sendMessage={sendMessage}
         status={status}
       />

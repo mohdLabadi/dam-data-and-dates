@@ -7,6 +7,7 @@ import {
   primaryKey,
   text,
   timestamp,
+  uniqueIndex,
   uuid,
   varchar,
 } from "drizzle-orm/pg-core";
@@ -168,3 +169,26 @@ export const stream = pgTable(
 );
 
 export type Stream = InferSelectModel<typeof stream>;
+
+export const savedMatch = pgTable(
+  "SavedMatch",
+  {
+    id: uuid("id").primaryKey().notNull().defaultRandom(),
+    createdAt: timestamp("createdAt").notNull(),
+    userId: uuid("userId")
+      .notNull()
+      .references(() => user.id),
+    documentId: uuid("documentId").notNull(),
+    profileId: text("profileId").notNull(),
+    profile: json("profile").notNull(),
+  },
+  (table) => ({
+    uniqueSavedProfile: uniqueIndex("SavedMatch_user_document_profile_unique").on(
+      table.userId,
+      table.documentId,
+      table.profileId
+    ),
+  })
+);
+
+export type SavedMatch = InferSelectModel<typeof savedMatch>;

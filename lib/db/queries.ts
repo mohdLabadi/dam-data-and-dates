@@ -24,6 +24,7 @@ import {
   type DBMessage,
   document,
   message,
+  savedMatch,
   type Suggestion,
   stream,
   suggestion,
@@ -32,6 +33,7 @@ import {
   vote,
 } from "./schema";
 import { generateHashedPassword } from "./utils";
+import type { PartnerProfile } from "../ai/preference-schema";
 
 // Optionally, if not using email/pass login, you can
 // use the Drizzle adapter for Auth.js / NextAuth
@@ -318,6 +320,86 @@ export async function getVotesByChatId({ id }: { id: string }) {
       "bad_request:database",
       "Failed to get votes by chat id"
     );
+  }
+}
+
+export async function saveMatch({
+  userId,
+  documentId,
+  profile,
+}: {
+  userId: string;
+  documentId: string;
+  profile: PartnerProfile;
+}) {
+  try {
+    const inserted = await db
+      .insert(savedMatch)
+      .values({
+        createdAt: new Date(),
+        userId,
+        documentId,
+        profileId: profile.id,
+        profile,
+      })
+      .onConflictDoNothing({
+        target: [savedMatch.userId, savedMatch.documentId, savedMatch.profileId],
+      })
+      .returning();
+
+    if (inserted.length > 0) {
+      return inserted[0];
+    }
+
+    const [existing] = await db
+      .select()
+      .from(savedMatch)
+      .where(
+        and(
+          eq(savedMatch.userId, userId),
+          eq(savedMatch.documentId, documentId),
+          eq(savedMatch.profileId, profile.id)
+        )
+      )
+      .limit(1);
+
+    return existing;
+  } catch (_error) {
+    throw new ChatbotError("bad_request:database", "Failed to save match");
+  }
+}
+
+export async function getSavedMatchesByUserId({ userId }: { userId: string }) {
+  try {
+    return await db
+      .select()
+      .from(savedMatch)
+      .where(eq(savedMatch.userId, userId))
+      .orderBy(desc(savedMatch.createdAt));
+  } catch (_error) {
+    throw new ChatbotError(
+      "bad_request:database",
+      "Failed to get saved matches"
+    );
+  }
+}
+
+export async function deleteSavedMatchById({
+  id,
+  userId,
+}: {
+  id: string;
+  userId: string;
+}) {
+  try {
+    const [deleted] = await db
+      .delete(savedMatch)
+      .where(and(eq(savedMatch.id, id), eq(savedMatch.userId, userId)))
+      .returning();
+
+    return deleted;
+  } catch (_error) {
+    throw new ChatbotError("bad_request:database", "Failed to delete match");
   }
 }
 
