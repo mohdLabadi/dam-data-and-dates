@@ -1,19 +1,13 @@
-import { gateway } from "@ai-sdk/gateway";
 import { createGoogleGenerativeAI } from "@ai-sdk/google";
 import {
   customProvider,
-  extractReasoningMiddleware,
   type ImageModel,
-  wrapLanguageModel,
 } from "ai";
 import { isTestEnvironment } from "../constants";
 
-const THINKING_SUFFIX_REGEX = /-thinking$/;
 const DEFAULT_DIRECT_GOOGLE_MODEL = "gemini-2.5-flash-lite";
 const DEFAULT_DIRECT_GOOGLE_IMAGE_MODEL = "gemini-2.5-flash-image";
-const DEFAULT_NANO_BANANA_IMAGE_MODEL = "google/gemini-2.5-flash-image";
-
-const hasAiGatewayApiKey = Boolean(process.env.AI_GATEWAY_API_KEY);
+const DEFAULT_NANO_BANANA_IMAGE_MODEL = "gemini-2.5-flash-image";
 const hasGoogleApiKey = Boolean(process.env.GOOGLE_GENERATIVE_AI_API_KEY);
 
 const google = hasGoogleApiKey
@@ -39,17 +33,11 @@ function getGoogleImageModelId(modelId: string) {
 }
 
 function getLanguageModelFromConfiguredProvider(modelId: string) {
-  if (hasAiGatewayApiKey) {
-    return gateway.languageModel(modelId);
-  }
-
   if (google) {
     return google(getGoogleModelId(modelId));
   }
 
-  throw new Error(
-    "Missing AI provider credentials. Set AI_GATEWAY_API_KEY or GOOGLE_GENERATIVE_AI_API_KEY."
-  );
+  throw new Error("Missing AI provider credentials. Set GOOGLE_GENERATIVE_AI_API_KEY.");
 }
 
 export const myProvider = isTestEnvironment
@@ -76,22 +64,6 @@ export function getLanguageModel(modelId: string) {
     return myProvider.languageModel(modelId);
   }
 
-  const isReasoningModel =
-    modelId.includes("reasoning") || modelId.endsWith("-thinking");
-
-  if (isReasoningModel && !hasAiGatewayApiKey && google) {
-    return google(DEFAULT_DIRECT_GOOGLE_MODEL);
-  }
-
-  if (isReasoningModel) {
-    const gatewayModelId = modelId.replace(THINKING_SUFFIX_REGEX, "");
-
-    return wrapLanguageModel({
-      model: gateway.languageModel(gatewayModelId),
-      middleware: extractReasoningMiddleware({ tagName: "thinking" }),
-    });
-  }
-
   return getLanguageModelFromConfiguredProvider(modelId);
 }
 
@@ -100,17 +72,11 @@ export function getTitleModel() {
     return myProvider.languageModel("title-model");
   }
 
-  if (hasAiGatewayApiKey) {
-    return gateway.languageModel("google/gemini-2.5-flash-lite");
-  }
-
   if (google) {
     return google(DEFAULT_DIRECT_GOOGLE_MODEL);
   }
 
-  throw new Error(
-    "Missing AI provider credentials. Set AI_GATEWAY_API_KEY or GOOGLE_GENERATIVE_AI_API_KEY."
-  );
+  throw new Error("Missing AI provider credentials. Set GOOGLE_GENERATIVE_AI_API_KEY.");
 }
 
 export function getArtifactModel() {
@@ -118,26 +84,16 @@ export function getArtifactModel() {
     return myProvider.languageModel("artifact-model");
   }
 
-  if (hasAiGatewayApiKey) {
-    return gateway.languageModel("anthropic/claude-haiku-4.5");
-  }
-
   if (google) {
     return google(DEFAULT_DIRECT_GOOGLE_MODEL);
   }
 
-  throw new Error(
-    "Missing AI provider credentials. Set AI_GATEWAY_API_KEY or GOOGLE_GENERATIVE_AI_API_KEY."
-  );
+  throw new Error("Missing AI provider credentials. Set GOOGLE_GENERATIVE_AI_API_KEY.");
 }
 
 export function getProfilePhotoImageModel(): ImageModel | null {
   const modelId =
     process.env.NANO_BANANA_IMAGE_MODEL ?? DEFAULT_NANO_BANANA_IMAGE_MODEL;
-
-  if (hasAiGatewayApiKey) {
-    return gateway.imageModel(modelId);
-  }
 
   if (google) {
     return google.imageModel(getGoogleImageModelId(modelId));
