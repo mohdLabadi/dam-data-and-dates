@@ -48,6 +48,7 @@ export interface PartnerProfile {
   type: ProfileType;
   name: string;
   age: number;
+  profilePhotoDataUrl?: string;
   location: string;
   occupation: string;
   height?: string;

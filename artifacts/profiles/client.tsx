@@ -1,6 +1,7 @@
 "use client";
 
 import type { UseChatHelpers } from "@ai-sdk/react";
+import Image from "next/image";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { Artifact } from "@/components/create-artifact";
@@ -49,7 +50,10 @@ function writeSavedMatchesToLocalStorage(matches: SavedMatchRecord[]) {
     return;
   }
 
-  window.localStorage.setItem(SAVED_MATCHES_STORAGE_KEY, JSON.stringify(matches));
+  window.localStorage.setItem(
+    SAVED_MATCHES_STORAGE_KEY,
+    JSON.stringify(matches),
+  );
 }
 
 const profileTypeConfig = {
@@ -114,35 +118,52 @@ function ProfileCard({
       {/* Body */}
       <div className="px-5 py-4">
         {/* Identity */}
-        <div className="mb-3">
-          <h3 className="text-lg font-bold text-zinc-900 dark:text-zinc-100">
-            {profile.name}, {profile.age}
-            {profile.height ? (
-              <span className="ml-2 text-sm font-normal text-zinc-500 dark:text-zinc-400">
-                · {profile.height}
-              </span>
-            ) : null}
-          </h3>
-          <p className="text-sm text-zinc-500 dark:text-zinc-400">
-            {profile.location} &middot; {profile.occupation}
-          </p>
+        <div className="mb-3 flex items-center gap-3">
+          <div className="relative h-14 w-14 overflow-hidden rounded-full border border-zinc-200 bg-zinc-100 dark:border-zinc-700 dark:bg-zinc-800">
+            {profile.profilePhotoDataUrl ? (
+              <Image
+                alt={`${profile.name} profile photo`}
+                className="h-full w-full object-cover"
+                height={56}
+                src={profile.profilePhotoDataUrl}
+                width={56}
+              />
+            ) : (
+              <div className="flex h-full w-full items-center justify-center text-sm font-semibold text-zinc-500 dark:text-zinc-400">
+                {profile.name
+                  .split(" ")
+                  .map((part) => part[0])
+                  .join("")
+                  .slice(0, 2)
+                  .toUpperCase()}
+              </div>
+            )}
+          </div>
+          <div>
+            <h3 className="text-lg font-bold text-zinc-900 dark:text-zinc-100">
+              {profile.name}, {profile.age}
+              {profile.height ? (
+                <span className="ml-2 text-sm font-normal text-zinc-500 dark:text-zinc-400">
+                  · {profile.height}
+                </span>
+              ) : null}
+            </h3>
+            <p className="text-sm text-zinc-500 dark:text-zinc-400">
+              {profile.location} &middot; {profile.occupation}
+            </p>
+          </div>
         </div>
 
         {/* Demographic details row */}
-        {(profile.ethnicity || profile.religion || profile.education || profile.politicalViews) && (
+        {(profile.ethnicity ||
+          profile.religion ||
+          profile.education ||
+          profile.politicalViews) && (
           <div className="mb-4 flex flex-wrap gap-x-4 gap-y-1 text-xs text-zinc-500 dark:text-zinc-400">
-            {profile.ethnicity && (
-              <span>{profile.ethnicity}</span>
-            )}
-            {profile.religion && (
-              <span>{profile.religion}</span>
-            )}
-            {profile.education && (
-              <span>{profile.education}</span>
-            )}
-            {profile.politicalViews && (
-              <span>{profile.politicalViews}</span>
-            )}
+            {profile.ethnicity && <span>{profile.ethnicity}</span>}
+            {profile.religion && <span>{profile.religion}</span>}
+            {profile.education && <span>{profile.education}</span>}
+            {profile.politicalViews && <span>{profile.politicalViews}</span>}
           </div>
         )}
 
@@ -336,7 +357,7 @@ function ProfilesContent({
 
   const savedProfileKeys = useMemo(() => {
     return new Set(
-      savedMatches.map((match) => `${match.documentId}:${match.profileId}`)
+      savedMatches.map((match) => `${match.documentId}:${match.profileId}`),
     );
   }, [savedMatches]);
 
@@ -378,7 +399,8 @@ function ProfilesContent({
       setSavedMatches((current) => {
         const alreadySaved = current.some(
           (item) =>
-            item.documentId === saved.documentId && item.profileId === saved.profileId
+            item.documentId === saved.documentId &&
+            item.profileId === saved.profileId,
         );
 
         if (alreadySaved) {
@@ -406,13 +428,11 @@ function ProfilesContent({
         method: "DELETE",
       });
 
-      setSavedMatches((current) =>
-        {
-          const next = current.filter((match) => match.id !== matchId);
-          writeSavedMatchesToLocalStorage(next);
-          return next;
-        }
-      );
+      setSavedMatches((current) => {
+        const next = current.filter((match) => match.id !== matchId);
+        writeSavedMatchesToLocalStorage(next);
+        return next;
+      });
 
       if (!response.ok) {
         // localStorage fallback already applied above
@@ -503,7 +523,8 @@ function ProfilesContent({
             </div>
           ) : savedMatches.length === 0 ? (
             <div className="rounded-xl border border-dashed border-zinc-300 p-4 text-sm text-zinc-500 dark:border-zinc-700 dark:text-zinc-400">
-              You haven&apos;t saved any matches yet. Click "Save match" on a profile to keep it here.
+              You haven&apos;t saved any matches yet. Click "Save match" on a
+              profile to keep it here.
             </div>
           ) : (
             savedMatches.map((savedMatch) => (
@@ -522,22 +543,24 @@ function ProfilesContent({
 
       {activeTab === "current" ? (
         <>
-      {profileSet.preferencesSummary && (
-        <p className="mb-6 text-sm text-zinc-500 dark:text-zinc-400">
-          {profileSet.preferencesSummary}
-        </p>
-      )}
-      {profileSet.profiles.map((profile) => (
-        <ProfileCard
-          isSaved={savedProfileKeys.has(`${metadata?.documentId}:${profile.id}`)}
-          isSaving={savingProfileId === profile.id}
-          key={profile.id}
-          onDislike={handleDislike}
-          onLike={handleLike}
-          onSave={handleSaveMatch}
-          profile={profile}
-        />
-      ))}
+          {profileSet.preferencesSummary && (
+            <p className="mb-6 text-sm text-zinc-500 dark:text-zinc-400">
+              {profileSet.preferencesSummary}
+            </p>
+          )}
+          {profileSet.profiles.map((profile) => (
+            <ProfileCard
+              isSaved={savedProfileKeys.has(
+                `${metadata?.documentId}:${profile.id}`,
+              )}
+              isSaving={savingProfileId === profile.id}
+              key={profile.id}
+              onDislike={handleDislike}
+              onLike={handleLike}
+              onSave={handleSaveMatch}
+              profile={profile}
+            />
+          ))}
         </>
       ) : null}
     </div>
@@ -562,13 +585,7 @@ export const profilesArtifact = new Artifact<"profiles", ProfilesMetadata>({
     }
   },
 
-  content: ({
-    content,
-    isLoading,
-    metadata,
-    status,
-    sendMessage,
-  }) => {
+  content: ({ content, isLoading, metadata, status, sendMessage }) => {
     return (
       <ProfilesContent
         content={content}

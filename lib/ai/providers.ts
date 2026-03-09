@@ -3,12 +3,15 @@ import { createGoogleGenerativeAI } from "@ai-sdk/google";
 import {
   customProvider,
   extractReasoningMiddleware,
+  type ImageModel,
   wrapLanguageModel,
 } from "ai";
 import { isTestEnvironment } from "../constants";
 
 const THINKING_SUFFIX_REGEX = /-thinking$/;
 const DEFAULT_DIRECT_GOOGLE_MODEL = "gemini-2.5-flash-lite";
+const DEFAULT_DIRECT_GOOGLE_IMAGE_MODEL = "gemini-2.5-flash-image";
+const DEFAULT_NANO_BANANA_IMAGE_MODEL = "google/gemini-2.5-flash-image";
 
 const hasAiGatewayApiKey = Boolean(process.env.AI_GATEWAY_API_KEY);
 const hasGoogleApiKey = Boolean(process.env.GOOGLE_GENERATIVE_AI_API_KEY);
@@ -25,6 +28,14 @@ function getGoogleModelId(modelId: string) {
   }
 
   return modelId.slice("google/".length);
+}
+
+function getGoogleImageModelId(modelId: string) {
+  if (!modelId.startsWith("google/")) {
+    return modelId || DEFAULT_DIRECT_GOOGLE_IMAGE_MODEL;
+  }
+
+  return modelId.slice("google/".length) || DEFAULT_DIRECT_GOOGLE_IMAGE_MODEL;
 }
 
 function getLanguageModelFromConfiguredProvider(modelId: string) {
@@ -118,4 +129,19 @@ export function getArtifactModel() {
   throw new Error(
     "Missing AI provider credentials. Set AI_GATEWAY_API_KEY or GOOGLE_GENERATIVE_AI_API_KEY."
   );
+}
+
+export function getProfilePhotoImageModel(): ImageModel | null {
+  const modelId =
+    process.env.NANO_BANANA_IMAGE_MODEL ?? DEFAULT_NANO_BANANA_IMAGE_MODEL;
+
+  if (hasAiGatewayApiKey) {
+    return gateway.imageModel(modelId);
+  }
+
+  if (google) {
+    return google.imageModel(getGoogleImageModelId(modelId));
+  }
+
+  return null;
 }

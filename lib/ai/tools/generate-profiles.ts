@@ -5,6 +5,8 @@ import {
   buildProfileGenerationPrompt,
   profileGenerationSystemPrompt,
 } from "@/lib/ai/prompts";
+import { generateProfilePhotoDataUrl } from "@/lib/ai/profile-photos";
+import type { ProfileSet } from "@/lib/ai/preference-schema";
 import { getArtifactModel } from "@/lib/ai/providers";
 import { saveDocument } from "@/lib/db/queries";
 import type { ChatMessage } from "@/lib/types";
@@ -128,6 +130,12 @@ export const generateProfiles = ({
 
       let profilesJson = "";
 
+      const stripMarkdownJsonFence = (input: string) =>
+        input
+          .trim()
+          .replace(/^```(?:json)?\n?/i, "")
+          .replace(/\n?```$/i, "");
+
       try {
         const { text } = await generateText({
           model: getArtifactModel(),
@@ -135,7 +143,41 @@ export const generateProfiles = ({
           prompt,
         });
 
-        profilesJson = text;
+        const cleaned = stripMarkdownJsonFence(text);
+
+        try {
+          const parsed = JSON.parse(cleaned) as ProfileSet;
+
+          if (Array.isArray(parsed.profiles) && parsed.profiles.length > 0) {
+            const enrichedProfiles = await Promise.all(
+              parsed.profiles.map(async (profile) => {
+                const profilePhotoDataUrl = await generateProfilePhotoDataUrl(profile);
+
+                if (!profilePhotoDataUrl) {
+                  return profile;
+                }
+
+                return {
+                  ...profile,
+                  profilePhotoDataUrl,
+                };
+              })
+            );
+
+            profilesJson = JSON.stringify(
+              {
+                ...parsed,
+                profiles: enrichedProfiles,
+              },
+              null,
+              2
+            );
+          } else {
+            profilesJson = cleaned;
+          }
+        } catch {
+          profilesJson = cleaned;
+        }
 
         // Stream the generated JSON to the artifact
         dataStream.write({

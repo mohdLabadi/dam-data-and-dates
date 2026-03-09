@@ -1,5 +1,6 @@
 import { auth } from "@/app/(auth)/auth";
 import type { PartnerProfile } from "@/lib/ai/preference-schema";
+import { generateProfilePhotoDataUrl } from "@/lib/ai/profile-photos";
 import {
   deleteSavedMatchById,
   getSavedMatchesByUserId,
@@ -46,10 +47,20 @@ export async function POST(request: Request) {
     ).toResponse();
   }
 
+  const profilePhotoDataUrl =
+    profile.profilePhotoDataUrl ?? (await generateProfilePhotoDataUrl(profile));
+
+  const profileWithPhoto: PartnerProfile = profilePhotoDataUrl
+    ? {
+        ...profile,
+        profilePhotoDataUrl,
+      }
+    : profile;
+
   const match = await saveMatch({
     userId: session.user.id,
     documentId,
-    profile,
+    profile: profileWithPhoto,
   });
 
   return Response.json(match, { status: 200 });
