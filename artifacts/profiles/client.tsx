@@ -75,7 +75,57 @@ const profileTypeConfig = {
     badgeClass:
       "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300",
   },
+  anti_match: {
+    label: "Intentional Anti-Match",
+    emoji: "🚫",
+    badgeClass: "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300",
+  },
 };
+
+function getProfileTypeConfig(rawType: string | undefined) {
+  const normalized = (rawType ?? "")
+    .toLowerCase()
+    .trim()
+    .replace(/[\s-]+/g, "_");
+
+  if (normalized === "close_match") {
+    return profileTypeConfig.close_match;
+  }
+
+  if (normalized === "moderate_stretch") {
+    return profileTypeConfig.moderate_stretch;
+  }
+
+  if (normalized === "exploratory") {
+    return profileTypeConfig.exploratory;
+  }
+
+  if (normalized === "anti_match") {
+    return profileTypeConfig.anti_match;
+  }
+
+  if (normalized.includes("anti")) {
+    return profileTypeConfig.anti_match;
+  }
+
+  if (normalized.includes("explor")) {
+    return {
+      ...profileTypeConfig.exploratory,
+      label: "Exploratory (Contrast)",
+    };
+  }
+
+  return profileTypeConfig.exploratory;
+}
+
+function isAntiMatchType(rawType: string | undefined) {
+  const normalized = (rawType ?? "")
+    .toLowerCase()
+    .trim()
+    .replace(/[\s-]+/g, "_");
+
+  return normalized === "anti_match" || normalized.includes("anti");
+}
 
 function ProfileCard({
   profile,
@@ -96,7 +146,7 @@ function ProfileCard({
   onLike: (profile: PartnerProfile) => void;
   onDislike: (profile: PartnerProfile) => void;
 }) {
-  const config = profileTypeConfig[profile.type];
+  const config = getProfileTypeConfig(profile.type);
 
   return (
     <div className="mb-6 rounded-2xl border border-zinc-200 bg-white shadow-sm dark:border-zinc-700 dark:bg-zinc-900">
@@ -464,7 +514,7 @@ function ProfilesContent({
       parts: [
         {
           type: "text",
-          text: `I liked ${profile.name}'s profile (${profile.type.replace("_", " ")}). Their traits that stood out to me: ${profile.traits.slice(0, 3).join(", ")}. Please regenerate all three profiles with more matches like this one.${docInstruction}`,
+          text: `I liked ${profile.name}'s profile (${profile.type.replace("_", " ")}). Their traits that stood out to me: ${profile.traits.slice(0, 3).join(", ")}. Please regenerate all four profiles with more matches like this one.${docInstruction}`,
         },
       ],
     });
@@ -482,7 +532,7 @@ function ProfilesContent({
       parts: [
         {
           type: "text",
-          text: `I didn't connect with ${profile.name}'s profile (${profile.type.replace("_", " ")}). Please regenerate all three profiles and avoid the qualities that made this one feel off.${docInstruction}`,
+          text: `I didn't connect with ${profile.name}'s profile (${profile.type.replace("_", " ")}). Please regenerate all four profiles and avoid the qualities that made this one feel off.${docInstruction}`,
         },
       ],
     });
@@ -550,14 +600,17 @@ function ProfilesContent({
           )}
           {profileSet.profiles.map((profile) => (
             <ProfileCard
-              isSaved={savedProfileKeys.has(
-                `${metadata?.documentId}:${profile.id}`,
-              )}
+              isSaved={
+                !isAntiMatchType(profile.type) &&
+                savedProfileKeys.has(`${metadata?.documentId}:${profile.id}`)
+              }
               isSaving={savingProfileId === profile.id}
               key={profile.id}
               onDislike={handleDislike}
               onLike={handleLike}
-              onSave={handleSaveMatch}
+              onSave={
+                isAntiMatchType(profile.type) ? undefined : handleSaveMatch
+              }
               profile={profile}
             />
           ))}

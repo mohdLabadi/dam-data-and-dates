@@ -16,7 +16,7 @@ export const profilesDocumentHandler = createDocumentHandler<"profiles">({
     const { text } = await generateText({
       model: getArtifactModel(),
       system: profileGenerationSystemPrompt,
-      prompt: `Generate 3 romantic partner profiles. Title context: ${title}`,
+      prompt: `Generate 4 romantic partner profiles with one close_match, one moderate_stretch, one exploratory, and one anti_match. Title context: ${title}`,
     });
 
     dataStream.write({

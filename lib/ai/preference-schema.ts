@@ -10,7 +10,11 @@ export type SocialStyle = "introvert" | "ambivert" | "extrovert";
 
 export type ActivityLevel = "sedentary" | "moderate" | "active" | "very_active";
 
-export type ProfileType = "close_match" | "moderate_stretch" | "exploratory";
+export type ProfileType =
+  | "close_match"
+  | "moderate_stretch"
+  | "exploratory"
+  | "anti_match";
 
 export interface PreferenceState {
   // Core demographics

@@ -24,7 +24,7 @@ import { PreviewAttachment } from "./preview-attachment";
 import { Weather } from "./weather";
 
 const EMPTY_ASSISTANT_FALLBACK_TEXT =
-  "The AI provider is currently quota-limited. Add billing/credits, use another API key, or switch provider and try again.";
+  "I couldn't generate a response for that request. Please try again.";
 
 const PurePreviewMessage = ({
   addToolApprovalResponse,
