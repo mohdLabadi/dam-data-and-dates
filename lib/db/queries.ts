@@ -409,12 +409,14 @@ export async function saveDocument({
   kind,
   content,
   userId,
+  chatId,
 }: {
   id: string;
   title: string;
   kind: ArtifactKind;
   content: string;
   userId: string;
+  chatId?: string;
 }) {
   try {
     return await db
@@ -425,11 +427,30 @@ export async function saveDocument({
         kind,
         content,
         userId,
+        chatId,
         createdAt: new Date(),
       })
       .returning();
   } catch (_error) {
     throw new ChatbotError("bad_request:database", "Failed to save document");
+  }
+}
+
+export async function getLatestProfileDocumentByChatId({
+  chatId,
+}: {
+  chatId: string;
+}) {
+  try {
+    const [doc] = await db
+      .select()
+      .from(document)
+      .where(and(eq(document.chatId, chatId), eq(document.kind, "profiles")))
+      .orderBy(desc(document.createdAt))
+      .limit(1);
+    return doc ?? null;
+  } catch (_error) {
+    return null;
   }
 }
 

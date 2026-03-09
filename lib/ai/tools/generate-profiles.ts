@@ -15,11 +15,13 @@ import { generateUUID } from "@/lib/utils";
 type GenerateProfilesProps = {
   session: Session;
   dataStream: UIMessageStreamWriter<ChatMessage>;
+  chatId: string;
 };
 
 export const generateProfiles = ({
   session,
   dataStream,
+  chatId,
 }: GenerateProfilesProps) =>
   tool({
     description:
@@ -211,6 +213,7 @@ export const generateProfiles = ({
           content: profilesJson,
           kind: "profiles",
           userId: session.user.id,
+          chatId,
         });
       }
 

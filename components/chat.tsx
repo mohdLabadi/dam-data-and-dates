@@ -7,7 +7,7 @@ import { useEffect, useRef, useState } from "react";
 import useSWR, { useSWRConfig } from "swr";
 import { unstable_serialize } from "swr/infinite";
 import { ChatHeader } from "@/components/chat-header";
-import { useArtifactSelector } from "@/hooks/use-artifact";
+import { useArtifact, useArtifactSelector } from "@/hooks/use-artifact";
 import { useAutoResume } from "@/hooks/use-auto-resume";
 import { useChatVisibility } from "@/hooks/use-chat-visibility";
 import type { Vote } from "@/lib/db/schema";
@@ -29,6 +29,7 @@ export function Chat({
   initialVisibilityType,
   isReadonly,
   autoResume,
+  initialProfileDocumentId,
 }: {
   id: string;
   initialMessages: ChatMessage[];
@@ -36,6 +37,7 @@ export function Chat({
   initialVisibilityType: VisibilityType;
   isReadonly: boolean;
   autoResume: boolean;
+  initialProfileDocumentId?: string | null;
 }) {
   const router = useRouter();
 
@@ -159,6 +161,21 @@ export function Chat({
 
   const [attachments, setAttachments] = useState<Attachment[]>([]);
   const isArtifactVisible = useArtifactSelector((state) => state.isVisible);
+  const { setArtifact } = useArtifact();
+
+  useEffect(() => {
+    if (initialProfileDocumentId) {
+      setArtifact((current) => ({
+        ...current,
+        documentId: initialProfileDocumentId,
+        kind: "profiles",
+        title: "Your Matches",
+        status: "idle",
+        isVisible: true,
+      }));
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialProfileDocumentId]);
 
   useAutoResume({
     autoResume,

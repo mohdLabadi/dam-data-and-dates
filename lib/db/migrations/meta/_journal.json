@@ -71,6 +71,13 @@
       "when": 1772812800000,
       "tag": "0009_quiet_lifeguard",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1773000000000,
+      "tag": "0010_add_chat_id_to_document",
+      "breakpoints": true
     }
   ]
 }

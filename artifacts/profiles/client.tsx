@@ -310,6 +310,12 @@ function ProfilesContent({
     };
   }, []);
 
+  const savedProfileKeys = useMemo(() => {
+    return new Set(
+      savedMatches.map((match) => `${match.documentId}:${match.profileId}`),
+    );
+  }, [savedMatches]);
+
   if (isLoading || (status === "streaming" && !content)) {
     return (
       <div className="p-6">
@@ -354,12 +360,6 @@ function ProfilesContent({
       </div>
     );
   }
-
-  const savedProfileKeys = useMemo(() => {
-    return new Set(
-      savedMatches.map((match) => `${match.documentId}:${match.profileId}`),
-    );
-  }, [savedMatches]);
 
   const handleSaveMatch = async (profile: PartnerProfile) => {
     if (!metadata?.documentId) {
