@@ -156,7 +156,11 @@ const PurePreviewMessage = ({
                           : undefined
                       }
                     >
-                      <Response>{sanitizeText(part.text)}</Response>
+                      <Response>{sanitizeText(
+                        message.role === "user"
+                          ? part.text.replace(/\s*Use updateDocument with id [a-f0-9-]+\.?/g, "")
+                          : part.text
+                      )}</Response>
                     </MessageContent>
                   </div>
                 );

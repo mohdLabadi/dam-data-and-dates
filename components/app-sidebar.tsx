@@ -117,6 +117,18 @@ export function AppSidebar({ user }: { user: User | undefined }) {
           </SidebarMenu>
         </SidebarHeader>
         <SidebarContent>
+          {user && (
+            <div className="px-2 py-1">
+              <Link
+                className="flex items-center gap-2 rounded-md px-2 py-1.5 text-sm text-zinc-600 hover:bg-muted hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100"
+                href="/saved"
+                onClick={() => setOpenMobile(false)}
+              >
+                <span>⭐</span>
+                <span>Saved Matches</span>
+              </Link>
+            </div>
+          )}
           <SidebarHistory user={user} />
         </SidebarContent>
         <SidebarFooter>{user && <SidebarUserNav user={user} />}</SidebarFooter>

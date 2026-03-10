@@ -75,11 +75,6 @@ const profileTypeConfig = {
     badgeClass:
       "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300",
   },
-  anti_match: {
-    label: "Intentional Anti-Match",
-    emoji: "🚫",
-    badgeClass: "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300",
-  },
 };
 
 function getProfileTypeConfig(rawType: string | undefined) {
@@ -94,25 +89,6 @@ function getProfileTypeConfig(rawType: string | undefined) {
 
   if (normalized === "moderate_stretch") {
     return profileTypeConfig.moderate_stretch;
-  }
-
-  if (normalized === "exploratory") {
-    return profileTypeConfig.exploratory;
-  }
-
-  if (normalized === "anti_match") {
-    return profileTypeConfig.anti_match;
-  }
-
-  if (normalized.includes("anti")) {
-    return profileTypeConfig.anti_match;
-  }
-
-  if (normalized.includes("explor")) {
-    return {
-      ...profileTypeConfig.exploratory,
-      label: "Exploratory (Contrast)",
-    };
   }
 
   return profileTypeConfig.exploratory;
