@@ -8,6 +8,8 @@ import type { PartnerProfile, ProfileSet } from "@/lib/ai/preference-schema";
 import type { ChatMessage } from "@/lib/types";
 import { generateUUID } from "@/lib/utils";
 
+type SwipeDecision = "like" | "pass";
+
 type SavedMatchRecord = {
   id: string;
   createdAt: string;
@@ -57,6 +59,7 @@ function ProfileCard({
   isSaved,
   isSaving,
   isRemoving,
+  saveLocked,
 }: {
   profile: PartnerProfile;
   onSave?: (profile: PartnerProfile) => void;
@@ -64,6 +67,7 @@ function ProfileCard({
   isSaved?: boolean;
   isSaving?: boolean;
   isRemoving?: boolean;
+  saveLocked?: boolean;
 }) {
   const initials = profile.name
     .split(" ")
@@ -98,11 +102,17 @@ function ProfileCard({
               {onSave ? (
                 <button
                   className="rounded-full border border-white/50 bg-black/30 px-2.5 py-1 text-xs font-medium text-white backdrop-blur-sm transition-colors hover:bg-black/50 disabled:cursor-not-allowed disabled:opacity-60"
-                  disabled={Boolean(isSaved) || Boolean(isSaving)}
+                  disabled={Boolean(isSaved) || Boolean(isSaving) || saveLocked}
                   onClick={() => onSave(profile)}
                   type="button"
                 >
-                  {isSaved ? "Saved" : isSaving ? "Saving..." : "Save"}
+                  {saveLocked
+                    ? "Swipe all first"
+                    : isSaved
+                      ? "Saved"
+                      : isSaving
+                        ? "Saving..."
+                        : "Save"}
                 </button>
               ) : null}
             </div>
@@ -126,15 +136,17 @@ function ProfileCard({
               {onSave ? (
                 <button
                   className="rounded-full border border-zinc-200 bg-white px-3 py-1 text-xs font-medium text-zinc-700 transition-colors hover:border-amber-300 hover:bg-amber-50 hover:text-amber-700 disabled:cursor-not-allowed disabled:opacity-60 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:border-amber-700 dark:hover:bg-amber-900/20 dark:hover:text-amber-300"
-                  disabled={Boolean(isSaved) || Boolean(isSaving)}
+                  disabled={Boolean(isSaved) || Boolean(isSaving) || saveLocked}
                   onClick={() => onSave(profile)}
                   type="button"
                 >
-                  {isSaved
-                    ? "⭐ Saved"
-                    : isSaving
-                      ? "Saving..."
-                      : "⭐ Save"}
+                  {saveLocked
+                    ? "Swipe all first"
+                    : isSaved
+                      ? "⭐ Saved"
+                      : isSaving
+                        ? "Saving..."
+                        : "⭐ Save"}
                 </button>
               ) : null}
             </div>
@@ -228,7 +240,16 @@ export function ProfilesChatCards({
   const [swipeStartX, setSwipeStartX] = useState<number | null>(null);
   const [swipeOffsetX, setSwipeOffsetX] = useState(0);
   const [isSwipeDragging, setIsSwipeDragging] = useState(false);
+  const [swipeDecisions, setSwipeDecisions] = useState<
+    Record<string, SwipeDecision>
+  >({});
+  const [hasSubmittedSwipeSummary, setHasSubmittedSwipeSummary] = useState(false);
   const activePointerIdRef = useRef<number | null>(null);
+
+  const profileIdsSignature = useMemo(
+    () => profileSet.profiles.map((profile) => profile.id).join("|"),
+    [profileSet.profiles],
+  );
 
   useEffect(() => {
     let isMounted = true;
@@ -285,6 +306,16 @@ export function ProfilesChatCards({
 
     setCurrentIndex((index) => Math.min(index, profileSet.profiles.length - 1));
   }, [profileSet.profiles.length]);
+
+  useEffect(() => {
+    setActiveTab("current");
+    setSwipeDecisions({});
+    setHasSubmittedSwipeSummary(false);
+    setSwipeStartX(null);
+    setSwipeOffsetX(0);
+    setIsSwipeDragging(false);
+    setCurrentIndex(0);
+  }, [profileIdsSignature]);
 
   useEffect(() => {
     if (savedMatches.length === 0) {
@@ -385,40 +416,56 @@ export function ProfilesChatCards({
     }
   };
 
-  const handleLike = (profile: PartnerProfile) => {
-    if (!sendMessage) return;
+  const submitSwipeSummary = (decisions: Record<string, SwipeDecision>) => {
+    if (!sendMessage || hasSubmittedSwipeSummary) {
+      return;
+    }
 
-    const docInstruction = documentId
-      ? ` Use updateDocument with id ${documentId}.`
-      : "";
+    const liked = profileSet.profiles
+      .filter((profile) => decisions[profile.id] === "like")
+      .map((profile) => profile.name);
+    const passed = profileSet.profiles
+      .filter((profile) => decisions[profile.id] === "pass")
+      .map((profile) => profile.name);
 
     sendMessage({
       role: "user",
       parts: [
         {
           type: "text",
-          text: `I liked ${profile.name}'s profile (${profile.type.replace("_", " ")}). Their traits that stood out to me: ${profile.traits.slice(0, 3).join(", ")}. Please regenerate all four profiles with more matches like this one.${docInstruction}`,
+          text: `I finished swiping through all generated matches. I liked: ${liked.length > 0 ? liked.join(", ") : "none"}. I passed on: ${passed.length > 0 ? passed.join(", ") : "none"}. Before suggesting new matches, ask me why I made these choices.`,
         },
       ],
     });
+
+    setHasSubmittedSwipeSummary(true);
   };
 
-  const handleDislike = (profile: PartnerProfile) => {
-    if (!sendMessage) return;
+  const registerSwipeDecision = (decision: SwipeDecision) => {
+    const activeProfile = profileSet.profiles[currentIndex];
 
-    const docInstruction = documentId
-      ? ` Use updateDocument with id ${documentId}.`
-      : "";
+    if (!activeProfile) {
+      return;
+    }
 
-    sendMessage({
-      role: "user",
-      parts: [
-        {
-          type: "text",
-          text: `I didn't connect with ${profile.name}'s profile (${profile.type.replace("_", " ")}). Please regenerate all four profiles and avoid the qualities that made this one feel off.${docInstruction}`,
-        },
-      ],
-    });
+    const nextDecisions: Record<string, SwipeDecision> = {
+      ...swipeDecisions,
+      [activeProfile.id]: decision,
+    };
+
+    setSwipeDecisions(nextDecisions);
+
+    const nextPendingIndex = profileSet.profiles.findIndex(
+      (profile) => !nextDecisions[profile.id],
+    );
+
+    if (nextPendingIndex >= 0) {
+      setCurrentIndex(nextPendingIndex);
+      return;
+    }
+
+    setCurrentIndex(profileSet.profiles.length - 1);
+    submitSwipeSummary(nextDecisions);
   };
 
   const resetSwipe = () => {
@@ -428,7 +475,7 @@ export function ProfilesChatCards({
   };
 
   const handleSwipeStart = (x: number) => {
-    if (activeTab !== "current") {
+    if (activeTab !== "current" || isSwipePhaseComplete) {
       return;
     }
 
@@ -462,9 +509,9 @@ export function ProfilesChatCards({
     const threshold = 90;
 
     if (swipeOffsetX >= threshold) {
-      handleLike(activeProfile);
+      registerSwipeDecision("like");
     } else if (swipeOffsetX <= -threshold) {
-      handleDislike(activeProfile);
+      registerSwipeDecision("pass");
     }
 
     resetSwipe();
@@ -477,6 +524,16 @@ export function ProfilesChatCards({
 
     return Boolean(target.closest("button,a,input,textarea,select"));
   };
+
+  const swipedCount = profileSet.profiles.reduce(
+    (count, profile) => (swipeDecisions[profile.id] ? count + 1 : count),
+    0,
+  );
+  const isSwipePhaseComplete =
+    profileSet.profiles.length > 0 && swipedCount === profileSet.profiles.length;
+  const activeProfileDecision = profileSet.profiles[currentIndex]
+    ? swipeDecisions[profileSet.profiles[currentIndex].id]
+    : undefined;
 
   return (
     <div className="w-full rounded-xl border border-border bg-background p-4">
@@ -496,14 +553,27 @@ export function ProfilesChatCards({
           className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${
             activeTab === "saved"
               ? "bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900"
-              : "bg-zinc-100 text-zinc-700 hover:bg-zinc-200 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700"
+              : "bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300"
           }`}
-          onClick={() => setActiveTab("saved")}
+          disabled={!isSwipePhaseComplete}
+          onClick={() => {
+            if (!isSwipePhaseComplete) {
+              return;
+            }
+            setActiveTab("saved");
+          }}
           type="button"
         >
           Saved ({savedMatches.length})
         </button>
       </div>
+
+      {!isSwipePhaseComplete && activeTab === "current" && (
+        <p className="mb-4 text-xs text-zinc-500 dark:text-zinc-400">
+          Swipe through every match first. After all swipes, chat will ask why
+          you made those choices and unlock navigation/saved matches.
+        </p>
+      )}
 
       {activeTab === "saved" ? (
         <div>
@@ -577,7 +647,7 @@ export function ProfilesChatCards({
                 <div className="flex items-center gap-2">
                   <button
                     className="rounded-full border border-zinc-200 px-2.5 py-1 hover:bg-zinc-100 disabled:opacity-50 dark:border-zinc-700 dark:hover:bg-zinc-800"
-                    disabled={currentIndex === 0}
+                    disabled={currentIndex === 0 || !isSwipePhaseComplete}
                     onClick={() =>
                       setCurrentIndex((index) => Math.max(0, index - 1))
                     }
@@ -587,7 +657,10 @@ export function ProfilesChatCards({
                   </button>
                   <button
                     className="rounded-full border border-zinc-200 px-2.5 py-1 hover:bg-zinc-100 disabled:opacity-50 dark:border-zinc-700 dark:hover:bg-zinc-800"
-                    disabled={currentIndex >= profileSet.profiles.length - 1}
+                    disabled={
+                      currentIndex >= profileSet.profiles.length - 1 ||
+                      !isSwipePhaseComplete
+                    }
                     onClick={() =>
                       setCurrentIndex((index) =>
                         Math.min(profileSet.profiles.length - 1, index + 1),
@@ -604,7 +677,10 @@ export function ProfilesChatCards({
                 className="relative"
                 onPointerCancel={handleSwipeEnd}
                 onPointerDown={(event) => {
-                  if (isInteractiveElement(event.target)) {
+                  if (
+                    isInteractiveElement(event.target) ||
+                    isSwipePhaseComplete
+                  ) {
                     return;
                   }
 
@@ -652,6 +728,7 @@ export function ProfilesChatCards({
                       savingProfileId === profileSet.profiles[currentIndex].id
                     }
                     key={profileSet.profiles[currentIndex].id}
+                    saveLocked={!isSwipePhaseComplete}
                     onSave={handleSaveMatch}
                     profile={profileSet.profiles[currentIndex]}
                   />
@@ -672,7 +749,9 @@ export function ProfilesChatCards({
               </div>
 
               <p className="-mt-2 mb-2 text-center text-xs text-zinc-500 dark:text-zinc-400">
-                Swipe left to pass, swipe right to like.
+                {isSwipePhaseComplete
+                  ? "Swiping complete. Use Prev/Next to review all matches."
+                  : `Swipe left to pass, swipe right to like. (${swipedCount}/${profileSet.profiles.length} done${activeProfileDecision ? `, current: ${activeProfileDecision}` : ""})`}
               </p>
             </>
           )}
