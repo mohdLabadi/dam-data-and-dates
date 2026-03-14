@@ -28,17 +28,18 @@ function PureChatHeader({
   const { data: session } = useSession();
   const isGuest = !session?.user || guestRegex.test(session.user.email ?? "");
   const accountLabel =
-    !isGuest && (session.user?.name?.trim() || session.user?.email?.split("@")[0])
+    !isGuest &&
+    (session.user?.name?.trim() || session.user?.email?.split("@")[0])
       ? session.user?.name?.trim() || session.user?.email?.split("@")[0]
       : "Account";
 
   return (
     <header className="sticky top-0 z-10 flex items-center justify-between gap-2 border-b border-border/70 bg-background px-2 py-1.5 md:px-2">
       <div
-        className="px-1 text-2xl leading-none tracking-normal text-primary md:text-3xl"
+        className="px-1 text-2xl leading-none tracking-normal text-primary italic md:text-3xl"
         style={{ fontFamily: "var(--font-marker), 'Brush Script MT', cursive" }}
       >
-        Cupid
+        Be My Cupid
       </div>
 
       <div className="flex items-center gap-2">
