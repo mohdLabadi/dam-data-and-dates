@@ -61,7 +61,9 @@ function PureArtifactMessages({
         <PreviewMessage
           addToolApprovalResponse={addToolApprovalResponse}
           chatId={chatId}
-          isLoading={status === "streaming" && index === visibleMessages.length - 1}
+          isLoading={
+            status === "streaming" && index === visibleMessages.length - 1
+          }
           isReadonly={isReadonly}
           key={message.id}
           message={message}
@@ -82,8 +84,8 @@ function PureArtifactMessages({
         {status === "submitted" &&
           !messages.some((msg) =>
             msg.parts?.some(
-              (part) => "state" in part && part.state === "approval-responded"
-            )
+              (part) => "state" in part && part.state === "approval-responded",
+            ),
           ) && <ThinkingMessage key="thinking" />}
       </AnimatePresence>
 
@@ -99,7 +101,7 @@ function PureArtifactMessages({
 
 function areEqual(
   prevProps: ArtifactMessagesProps,
-  nextProps: ArtifactMessagesProps
+  nextProps: ArtifactMessagesProps,
 ) {
   if (
     prevProps.artifactStatus === "streaming" &&

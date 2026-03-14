@@ -102,10 +102,7 @@ const drinkingOptions = [
 const truncate = (value: string, max: number) => value.trim().slice(0, max);
 
 const normalizeTag = (value: string) =>
-  value
-    .trim()
-    .replace(/\s+/g, " ")
-    .slice(0, 40);
+  value.trim().replace(/\s+/g, " ").slice(0, 40);
 
 const labelByValue = (
   value: string,
@@ -211,7 +208,11 @@ function TagInput({
               return;
             }
 
-            if (event.key === "Backspace" && value.length === 0 && tags.length > 0) {
+            if (
+              event.key === "Backspace" &&
+              value.length === 0 &&
+              tags.length > 0
+            ) {
               onChange(tags.slice(0, -1));
             }
           }}
@@ -242,18 +243,18 @@ export function IntakeForm({
 
     return Boolean(
       values.firstName.trim().length >= 2 &&
-        Number.isFinite(age) &&
-        age >= 18 &&
-        age <= 99 &&
-        Number.isFinite(preferredAgeMin) &&
-        Number.isFinite(preferredAgeMax) &&
-        preferredAgeMin >= 18 &&
-        preferredAgeMax <= 99 &&
-        preferredAgeMin <= preferredAgeMax &&
-        values.relationshipGoal &&
-        values.interestedIn &&
-        values.hobbies.length > 0 &&
-        values.partnerQualities.length > 0,
+      Number.isFinite(age) &&
+      age >= 18 &&
+      age <= 99 &&
+      Number.isFinite(preferredAgeMin) &&
+      Number.isFinite(preferredAgeMax) &&
+      preferredAgeMin >= 18 &&
+      preferredAgeMax <= 99 &&
+      preferredAgeMin <= preferredAgeMax &&
+      values.relationshipGoal &&
+      values.interestedIn &&
+      values.hobbies.length > 0 &&
+      values.partnerQualities.length > 0,
     );
   }, [values]);
 
@@ -261,9 +262,12 @@ export function IntakeForm({
     <div className="mx-auto w-full max-w-5xl px-3 pb-6 pt-4 md:px-4">
       <Card className="overflow-hidden border-border/80">
         <CardHeader className="bg-muted/40 pb-4">
-          <CardTitle className="text-xl md:text-2xl">Build your dating profile</CardTitle>
+          <CardTitle className="text-xl md:text-2xl">
+            Build your dating profile
+          </CardTitle>
           <CardDescription>
-            Share your basics and preferences. We will generate matches immediately after submit.
+            Share your basics and preferences. We will generate matches
+            immediately after submit.
           </CardDescription>
         </CardHeader>
 
@@ -327,7 +331,9 @@ export function IntakeForm({
                   onChange={(event) =>
                     setValues((prev) => ({
                       ...prev,
-                      preferredAgeMin: event.target.value.replace(/\D/g, "").slice(0, 2),
+                      preferredAgeMin: event.target.value
+                        .replace(/\D/g, "")
+                        .slice(0, 2),
                     }))
                   }
                   placeholder="27"
@@ -347,7 +353,9 @@ export function IntakeForm({
                   onChange={(event) =>
                     setValues((prev) => ({
                       ...prev,
-                      preferredAgeMax: event.target.value.replace(/\D/g, "").slice(0, 2),
+                      preferredAgeMax: event.target.value
+                        .replace(/\D/g, "")
+                        .slice(0, 2),
                     }))
                   }
                   placeholder="36"
@@ -364,7 +372,10 @@ export function IntakeForm({
                 id="location"
                 maxLength={120}
                 onChange={(event) =>
-                  setValues((prev) => ({ ...prev, location: event.target.value }))
+                  setValues((prev) => ({
+                    ...prev,
+                    location: event.target.value,
+                  }))
                 }
                 placeholder="Brooklyn, NY"
                 value={values.location}
@@ -381,7 +392,9 @@ export function IntakeForm({
                 onChange={(event) =>
                   setValues((prev) => ({
                     ...prev,
-                    maxDistanceMiles: event.target.value.replace(/\D/g, "").slice(0, 3),
+                    maxDistanceMiles: event.target.value
+                      .replace(/\D/g, "")
+                      .slice(0, 3),
                   }))
                 }
                 placeholder="25"
@@ -499,7 +512,9 @@ export function IntakeForm({
               <TagInput
                 id="hobbies"
                 label="Hobbies and interests *"
-                onChange={(next) => setValues((prev) => ({ ...prev, hobbies: next }))}
+                onChange={(next) =>
+                  setValues((prev) => ({ ...prev, hobbies: next }))
+                }
                 placeholder="Add one hobby at a time"
                 tags={values.hobbies}
               />
@@ -521,7 +536,9 @@ export function IntakeForm({
               <TagInput
                 id="values"
                 label="Core values"
-                onChange={(next) => setValues((prev) => ({ ...prev, values: next }))}
+                onChange={(next) =>
+                  setValues((prev) => ({ ...prev, values: next }))
+                }
                 placeholder="Family-oriented, growth mindset"
                 tags={values.values}
               />
@@ -545,7 +562,10 @@ export function IntakeForm({
                 id="lifestyle"
                 maxLength={240}
                 onChange={(event) =>
-                  setValues((prev) => ({ ...prev, lifestyle: event.target.value }))
+                  setValues((prev) => ({
+                    ...prev,
+                    lifestyle: event.target.value,
+                  }))
                 }
                 placeholder="Any context about your lifestyle or dating preferences"
                 rows={3}
@@ -555,7 +575,8 @@ export function IntakeForm({
 
             <div className="md:col-span-2 flex items-center justify-between gap-3 border-t pt-4">
               <p className="text-xs text-muted-foreground">
-                Required: name, age, preferred age range, connection goal, interested-in, hobbies, and partner qualities.
+                Required: name, age, preferred age range, connection goal,
+                interested-in, hobbies, and partner qualities.
               </p>
               <Button disabled={!canSubmit || isSubmitting} type="submit">
                 {isSubmitting ? "Generating matches..." : "Generate my matches"}

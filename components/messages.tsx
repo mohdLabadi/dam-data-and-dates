@@ -41,7 +41,9 @@ function PureMessages({
       (part) =>
         part.type === "text" &&
         (part.text.startsWith(INTAKE_MESSAGE_PREFIX) ||
-          part.text.includes(`${INTAKE_MESSAGE_PREFIX}I completed your dating intake form.`)),
+          part.text.includes(
+            `${INTAKE_MESSAGE_PREFIX}I completed your dating intake form.`,
+          )),
     );
   };
 
@@ -96,8 +98,9 @@ function PureMessages({
           {status === "submitted" &&
             !messages.some((msg) =>
               msg.parts?.some(
-                (part) => "state" in part && part.state === "approval-responded"
-              )
+                (part) =>
+                  "state" in part && part.state === "approval-responded",
+              ),
             ) && <ThinkingMessage />}
 
           <div
