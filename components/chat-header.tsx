@@ -1,10 +1,12 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { memo } from "react";
+import { memo, useState } from "react";
 import { useSession, signOut } from "next-auth/react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
+import type { PartnerProfile } from "@/lib/ai/preference-schema";
+import { ProfileCard } from "./profiles-chat-cards";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -14,6 +16,13 @@ import {
 import { PlusIcon } from "./icons";
 import { guestRegex } from "@/lib/constants";
 import type { VisibilityType } from "./visibility-selector";
+
+type SavedMatchRecord = {
+  id: string;
+  documentId: string;
+  profileId: string;
+  profile: PartnerProfile;
+};
 
 function PureChatHeader({
   chatId: _chatId,
@@ -27,6 +36,51 @@ function PureChatHeader({
   const router = useRouter();
   const { data: session } = useSession();
   const isGuest = !session?.user || guestRegex.test(session.user.email ?? "");
+  const [isSavedMatchesOpen, setIsSavedMatchesOpen] = useState(false);
+  const [savedMatches, setSavedMatches] = useState<SavedMatchRecord[]>([]);
+  const [isSavedLoading, setIsSavedLoading] = useState(false);
+  const [removingId, setRemovingId] = useState<string | null>(null);
+
+  const openSavedMatches = async () => {
+    setIsSavedMatchesOpen(true);
+    setIsSavedLoading(true);
+
+    try {
+      const response = await fetch("/api/matches");
+
+      if (!response.ok) {
+        throw new Error("failed to fetch saved matches");
+      }
+
+      const matches = (await response.json()) as SavedMatchRecord[];
+      setSavedMatches(matches);
+    } catch {
+      setSavedMatches([]);
+    } finally {
+      setIsSavedLoading(false);
+    }
+  };
+
+  const removeSavedMatch = async (id: string) => {
+    setRemovingId(id);
+
+    try {
+      const response = await fetch(`/api/matches?id=${id}`, {
+        method: "DELETE",
+      });
+
+      if (!response.ok) {
+        throw new Error("failed to remove");
+      }
+
+      setSavedMatches((current) => current.filter((match) => match.id !== id));
+    } catch {
+      // keep UI state unchanged on failure
+    } finally {
+      setRemovingId(null);
+    }
+  };
+
   const accountLabel =
     !isGuest &&
     (session.user?.name?.trim() || session.user?.email?.split("@")[0])
@@ -43,6 +97,14 @@ function PureChatHeader({
       </div>
 
       <div className="flex items-center gap-2">
+        <Button
+          className="h-8 px-2 text-xs md:h-fit"
+          onClick={openSavedMatches}
+          variant="outline"
+        >
+          Saved Matches
+        </Button>
+
         <Button
           className="h-8 px-2 md:h-fit md:px-2"
           onClick={() => {
@@ -82,6 +144,47 @@ function PureChatHeader({
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
+
+      {isSavedMatchesOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="max-h-[90vh] w-full max-w-5xl overflow-hidden rounded-2xl border border-border bg-background shadow-xl">
+            <div className="flex items-center justify-between border-b border-border px-4 py-3">
+              <h2 className="font-semibold text-base">Saved Matches</h2>
+              <Button
+                className="h-8 px-2"
+                onClick={() => setIsSavedMatchesOpen(false)}
+                variant="ghost"
+              >
+                Close
+              </Button>
+            </div>
+
+            <div className="max-h-[calc(90vh-57px)] overflow-y-auto p-4">
+              {isSavedLoading ? (
+                <p className="text-sm text-zinc-500">
+                  Loading saved matches...
+                </p>
+              ) : savedMatches.length === 0 ? (
+                <p className="text-sm text-zinc-500">
+                  No saved matches yet. Save profiles from chat to see them
+                  here.
+                </p>
+              ) : (
+                <div className="space-y-2">
+                  {savedMatches.map((match) => (
+                    <ProfileCard
+                      isRemoving={removingId === match.id}
+                      key={match.id}
+                      onRemove={() => removeSavedMatch(match.id)}
+                      profile={match.profile}
+                    />
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </header>
   );
 }

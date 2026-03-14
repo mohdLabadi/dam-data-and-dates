@@ -52,7 +52,7 @@ function writeSavedMatchesToLocalStorage(matches: SavedMatchRecord[]) {
   );
 }
 
-function ProfileCard({
+export function ProfileCard({
   profile,
   onSave,
   onRemove,
@@ -203,7 +203,7 @@ function ProfileCard({
             ))}
           </div>
 
-          <div className="flex flex-wrap justify-end gap-2 border-zinc-100 pt-1 md:border-t dark:border-zinc-800">
+          <div className="flex justify-end border-zinc-100 pt-1 md:border-t dark:border-zinc-800">
             {onRemove ? (
               <button
                 className="flex items-center gap-1.5 rounded-full border border-zinc-200 bg-white px-4 py-1.5 text-sm font-medium text-zinc-700 transition-colors hover:border-zinc-400 hover:bg-zinc-100 disabled:cursor-not-allowed disabled:opacity-60 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:border-zinc-500 dark:hover:bg-zinc-700"
@@ -230,13 +230,9 @@ export function ProfilesChatCards({
   documentId?: string;
   sendMessage?: UseChatHelpers<ChatMessage>["sendMessage"];
 }) {
-  const [activeTab, setActiveTab] = useState<"current" | "saved">("current");
   const [savedMatches, setSavedMatches] = useState<SavedMatchRecord[]>([]);
-  const [isSavedLoading, setIsSavedLoading] = useState(true);
   const [savingProfileId, setSavingProfileId] = useState<string | null>(null);
-  const [removingMatchId, setRemovingMatchId] = useState<string | null>(null);
   const [currentIndex, setCurrentIndex] = useState(0);
-  const [savedIndex, setSavedIndex] = useState(0);
   const [swipeStartX, setSwipeStartX] = useState<number | null>(null);
   const [swipeOffsetX, setSwipeOffsetX] = useState(0);
   const [isSwipeDragging, setIsSwipeDragging] = useState(false);
@@ -279,10 +275,6 @@ export function ProfilesChatCards({
         if (isMounted) {
           setSavedMatches(localMatches);
         }
-      } finally {
-        if (isMounted) {
-          setIsSavedLoading(false);
-        }
       }
     };
 
@@ -309,7 +301,6 @@ export function ProfilesChatCards({
   }, [profileSet.profiles.length]);
 
   useEffect(() => {
-    setActiveTab("current");
     setSwipeDecisions({});
     setHasSubmittedSwipeSummary(false);
     setSwipeStartX(null);
@@ -317,15 +308,6 @@ export function ProfilesChatCards({
     setIsSwipeDragging(false);
     setCurrentIndex(0);
   }, [profileIdsSignature]);
-
-  useEffect(() => {
-    if (savedMatches.length === 0) {
-      setSavedIndex(0);
-      return;
-    }
-
-    setSavedIndex((index) => Math.min(index, savedMatches.length - 1));
-  }, [savedMatches.length]);
 
   const handleSaveMatch = async (profile: PartnerProfile) => {
     if (!documentId) {
@@ -383,37 +365,6 @@ export function ProfilesChatCards({
       toast.error("Unable to save this match right now.");
     } finally {
       setSavingProfileId(null);
-    }
-  };
-
-  const handleRemoveSavedMatch = async (matchId: string) => {
-    try {
-      setRemovingMatchId(matchId);
-
-      const response = await fetch(`/api/matches?id=${matchId}`, {
-        method: "DELETE",
-      });
-
-      setSavedMatches((current) => {
-        const next = current.filter((match) => match.id !== matchId);
-        writeSavedMatchesToLocalStorage(next);
-        return next;
-      });
-
-      if (!response.ok) {
-        // localStorage fallback already applied above
-      }
-
-      toast.success("Match removed from saved list.");
-    } catch {
-      setSavedMatches((current) => {
-        const next = current.filter((match) => match.id !== matchId);
-        writeSavedMatchesToLocalStorage(next);
-        return next;
-      });
-      toast.success("Match removed from saved list.");
-    } finally {
-      setRemovingMatchId(null);
     }
   };
 
@@ -476,7 +427,7 @@ export function ProfilesChatCards({
   };
 
   const handleSwipeStart = (x: number) => {
-    if (activeTab !== "current" || isSwipePhaseComplete) {
+    if (isSwipePhaseComplete) {
       return;
     }
 
@@ -485,7 +436,7 @@ export function ProfilesChatCards({
   };
 
   const handleSwipeMove = (x: number) => {
-    if (swipeStartX === null || activeTab !== "current") {
+    if (swipeStartX === null) {
       return;
     }
 
@@ -495,11 +446,6 @@ export function ProfilesChatCards({
   };
 
   const handleSwipeEnd = () => {
-    if (activeTab !== "current") {
-      resetSwipe();
-      return;
-    }
-
     const activeProfile = profileSet.profiles[currentIndex];
 
     if (!activeProfile) {
@@ -539,224 +485,130 @@ export function ProfilesChatCards({
 
   return (
     <div className="w-full rounded-xl border border-border bg-background p-4">
-      <div className="mb-5 flex items-center gap-2">
-        <button
-          className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${
-            activeTab === "current"
-              ? "bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900"
-              : "bg-zinc-100 text-zinc-700 hover:bg-zinc-200 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700"
-          }`}
-          onClick={() => setActiveTab("current")}
-          type="button"
-        >
-          Current Matches
-        </button>
-        <button
-          className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${
-            activeTab === "saved"
-              ? "bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900"
-              : "bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300"
-          }`}
-          disabled={!isSwipePhaseComplete}
-          onClick={() => {
-            if (!isSwipePhaseComplete) {
-              return;
-            }
-            setActiveTab("saved");
-          }}
-          type="button"
-        >
-          Saved ({savedMatches.length})
-        </button>
-      </div>
-
-      {!isSwipePhaseComplete && activeTab === "current" && (
+      {!isSwipePhaseComplete && (
         <p className="mb-4 text-xs text-zinc-500 dark:text-zinc-400">
           Swipe through every match first. After all swipes, chat will ask why
-          you made those choices and unlock navigation/saved matches.
+          you made those choices and unlock full review navigation.
         </p>
       )}
 
-      {activeTab === "saved" ? (
-        <div>
-          {isSavedLoading ? (
-            <div className="text-sm text-zinc-500 dark:text-zinc-400">
-              Loading saved matches...
-            </div>
-          ) : savedMatches.length === 0 ? (
-            <div className="rounded-xl border border-dashed border-zinc-300 p-4 text-sm text-zinc-500 dark:border-zinc-700 dark:text-zinc-400">
-              You haven&apos;t saved any matches yet. Click "Save match" on a
-              profile to keep it here.
-            </div>
-          ) : (
-            <>
-              <div className="mb-3 flex items-center justify-between text-xs text-zinc-500 dark:text-zinc-400">
-                <span>
-                  Saved profile {savedIndex + 1} of {savedMatches.length}
-                </span>
-                <div className="flex items-center gap-2">
-                  <button
-                    className="rounded-full border border-zinc-200 px-2.5 py-1 hover:bg-zinc-100 disabled:opacity-50 dark:border-zinc-700 dark:hover:bg-zinc-800"
-                    disabled={savedIndex === 0}
-                    onClick={() =>
-                      setSavedIndex((index) => Math.max(0, index - 1))
-                    }
-                    type="button"
-                  >
-                    Prev
-                  </button>
-                  <button
-                    className="rounded-full border border-zinc-200 px-2.5 py-1 hover:bg-zinc-100 disabled:opacity-50 dark:border-zinc-700 dark:hover:bg-zinc-800"
-                    disabled={savedIndex >= savedMatches.length - 1}
-                    onClick={() =>
-                      setSavedIndex((index) =>
-                        Math.min(savedMatches.length - 1, index + 1),
-                      )
-                    }
-                    type="button"
-                  >
-                    Next
-                  </button>
-                </div>
-              </div>
-
-              <ProfileCard
-                key={savedMatches[savedIndex].id}
-                isRemoving={removingMatchId === savedMatches[savedIndex].id}
-                onRemove={() =>
-                  handleRemoveSavedMatch(savedMatches[savedIndex].id)
-                }
-                profile={savedMatches[savedIndex].profile}
-              />
-            </>
-          )}
-        </div>
-      ) : null}
-
-      {activeTab === "current" ? (
+      {profileSet.preferencesSummary && (
+        <p className="mb-6 text-sm text-zinc-500 dark:text-zinc-400">
+          {profileSet.preferencesSummary}
+        </p>
+      )}
+      {profileSet.profiles.length > 0 && (
         <>
-          {profileSet.preferencesSummary && (
-            <p className="mb-6 text-sm text-zinc-500 dark:text-zinc-400">
-              {profileSet.preferencesSummary}
-            </p>
-          )}
-          {profileSet.profiles.length > 0 && (
-            <>
-              <div className="mb-3 flex items-center justify-between text-xs text-zinc-500 dark:text-zinc-400">
-                <span>
-                  Match {currentIndex + 1} of {profileSet.profiles.length}
-                </span>
-                <div className="flex items-center gap-2">
-                  <button
-                    className="rounded-full border border-zinc-200 px-2.5 py-1 hover:bg-zinc-100 disabled:opacity-50 dark:border-zinc-700 dark:hover:bg-zinc-800"
-                    disabled={currentIndex === 0 || !isSwipePhaseComplete}
-                    onClick={() =>
-                      setCurrentIndex((index) => Math.max(0, index - 1))
-                    }
-                    type="button"
-                  >
-                    Prev
-                  </button>
-                  <button
-                    className="rounded-full border border-zinc-200 px-2.5 py-1 hover:bg-zinc-100 disabled:opacity-50 dark:border-zinc-700 dark:hover:bg-zinc-800"
-                    disabled={
-                      currentIndex >= profileSet.profiles.length - 1 ||
-                      !isSwipePhaseComplete
-                    }
-                    onClick={() =>
-                      setCurrentIndex((index) =>
-                        Math.min(profileSet.profiles.length - 1, index + 1),
-                      )
-                    }
-                    type="button"
-                  >
-                    Next
-                  </button>
-                </div>
-              </div>
-
-              <div
-                className="relative"
-                onPointerCancel={handleSwipeEnd}
-                onPointerDown={(event) => {
-                  if (
-                    isInteractiveElement(event.target) ||
-                    isSwipePhaseComplete
-                  ) {
-                    return;
-                  }
-
-                  activePointerIdRef.current = event.pointerId;
-                  event.currentTarget.setPointerCapture(event.pointerId);
-                  handleSwipeStart(event.clientX);
-                }}
-                onPointerMove={(event) => {
-                  if (activePointerIdRef.current !== event.pointerId) {
-                    return;
-                  }
-
-                  handleSwipeMove(event.clientX);
-                }}
-                onPointerUp={(event) => {
-                  if (activePointerIdRef.current !== event.pointerId) {
-                    return;
-                  }
-
-                  activePointerIdRef.current = null;
-                  if (event.currentTarget.hasPointerCapture(event.pointerId)) {
-                    event.currentTarget.releasePointerCapture(event.pointerId);
-                  }
-                  handleSwipeEnd();
-                }}
-                style={{ touchAction: "pan-y" }}
+          <div className="mb-3 flex items-center justify-between text-xs text-zinc-500 dark:text-zinc-400">
+            <span>
+              Match {currentIndex + 1} of {profileSet.profiles.length}
+            </span>
+            <div className="flex items-center gap-2">
+              <button
+                className="rounded-full border border-zinc-200 px-2.5 py-1 hover:bg-zinc-100 disabled:opacity-50 dark:border-zinc-700 dark:hover:bg-zinc-800"
+                disabled={currentIndex === 0 || !isSwipePhaseComplete}
+                onClick={() =>
+                  setCurrentIndex((index) => Math.max(0, index - 1))
+                }
+                type="button"
               >
-                <div
-                  className={
-                    isSwipeDragging
-                      ? "transition-none"
-                      : "transition-transform duration-200"
-                  }
-                  style={{
-                    transform: `translateX(${swipeOffsetX}px) rotate(${swipeOffsetX / 25}deg)`,
-                  }}
-                >
-                  <ProfileCard
-                    isSaved={savedProfileKeys.has(
-                      `${documentId}:${profileSet.profiles[currentIndex].id}`,
-                    )}
-                    isSaving={
-                      savingProfileId === profileSet.profiles[currentIndex].id
-                    }
-                    key={profileSet.profiles[currentIndex].id}
-                    saveLocked={!isSwipePhaseComplete}
-                    onSave={handleSaveMatch}
-                    profile={profileSet.profiles[currentIndex]}
-                  />
-                </div>
+                Prev
+              </button>
+              <button
+                className="rounded-full border border-zinc-200 px-2.5 py-1 hover:bg-zinc-100 disabled:opacity-50 dark:border-zinc-700 dark:hover:bg-zinc-800"
+                disabled={
+                  currentIndex >= profileSet.profiles.length - 1 ||
+                  !isSwipePhaseComplete
+                }
+                onClick={() =>
+                  setCurrentIndex((index) =>
+                    Math.min(profileSet.profiles.length - 1, index + 1),
+                  )
+                }
+                type="button"
+              >
+                Next
+              </button>
+            </div>
+          </div>
 
-                <div
-                  className="pointer-events-none absolute top-3 left-3 rounded-full bg-red-600/90 px-2.5 py-1 text-xs font-semibold text-white"
-                  style={{ opacity: Math.max(0, -swipeOffsetX / 70) }}
-                >
-                  👎 Pass
-                </div>
-                <div
-                  className="pointer-events-none absolute top-3 right-3 rounded-full bg-green-600/90 px-2.5 py-1 text-xs font-semibold text-white"
-                  style={{ opacity: Math.max(0, swipeOffsetX / 70) }}
-                >
-                  👍 Like
-                </div>
-              </div>
+          <div
+            className="relative"
+            onPointerCancel={handleSwipeEnd}
+            onPointerDown={(event) => {
+              if (isInteractiveElement(event.target) || isSwipePhaseComplete) {
+                return;
+              }
 
-              <p className="-mt-2 mb-2 text-center text-xs text-zinc-500 dark:text-zinc-400">
-                {isSwipePhaseComplete
-                  ? "Swiping complete. Use Prev/Next to review all matches."
-                  : `Swipe left to pass, swipe right to like. (${swipedCount}/${profileSet.profiles.length} done${activeProfileDecision ? `, current: ${activeProfileDecision}` : ""})`}
-              </p>
-            </>
-          )}
+              activePointerIdRef.current = event.pointerId;
+              event.currentTarget.setPointerCapture(event.pointerId);
+              handleSwipeStart(event.clientX);
+            }}
+            onPointerMove={(event) => {
+              if (activePointerIdRef.current !== event.pointerId) {
+                return;
+              }
+
+              handleSwipeMove(event.clientX);
+            }}
+            onPointerUp={(event) => {
+              if (activePointerIdRef.current !== event.pointerId) {
+                return;
+              }
+
+              activePointerIdRef.current = null;
+              if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+                event.currentTarget.releasePointerCapture(event.pointerId);
+              }
+              handleSwipeEnd();
+            }}
+            style={{ touchAction: "pan-y" }}
+          >
+            <div
+              className={
+                isSwipeDragging
+                  ? "transition-none"
+                  : "transition-transform duration-200"
+              }
+              style={{
+                transform: `translateX(${swipeOffsetX}px) rotate(${swipeOffsetX / 25}deg)`,
+              }}
+            >
+              <ProfileCard
+                isSaved={savedProfileKeys.has(
+                  `${documentId}:${profileSet.profiles[currentIndex].id}`,
+                )}
+                isSaving={
+                  savingProfileId === profileSet.profiles[currentIndex].id
+                }
+                key={profileSet.profiles[currentIndex].id}
+                saveLocked={!isSwipePhaseComplete}
+                onSave={handleSaveMatch}
+                profile={profileSet.profiles[currentIndex]}
+              />
+            </div>
+
+            <div
+              className="pointer-events-none absolute top-3 left-3 rounded-full bg-red-600/90 px-2.5 py-1 text-xs font-semibold text-white"
+              style={{ opacity: Math.max(0, -swipeOffsetX / 70) }}
+            >
+              👎 Pass
+            </div>
+            <div
+              className="pointer-events-none absolute top-3 right-3 rounded-full bg-green-600/90 px-2.5 py-1 text-xs font-semibold text-white"
+              style={{ opacity: Math.max(0, swipeOffsetX / 70) }}
+            >
+              👍 Like
+            </div>
+          </div>
+
+          <p className="-mt-2 mb-2 text-center text-xs text-zinc-500 dark:text-zinc-400">
+            {isSwipePhaseComplete
+              ? "Swiping complete. Use Prev/Next to review all matches."
+              : `Swipe left to pass, swipe right to like. (${swipedCount}/${profileSet.profiles.length} done${activeProfileDecision ? `, current: ${activeProfileDecision}` : ""})`}
+          </p>
         </>
-      ) : null}
+      )}
     </div>
   );
 }
