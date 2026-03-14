@@ -50,15 +50,6 @@ function writeSavedMatchesToLocalStorage(matches: SavedMatchRecord[]) {
   );
 }
 
-function isAntiMatchType(rawType: string | undefined) {
-  const normalized = (rawType ?? "")
-    .toLowerCase()
-    .trim()
-    .replace(/[\s-]+/g, "_");
-
-  return normalized === "anti_match" || normalized.includes("anti");
-}
-
 function ProfileCard({
   profile,
   onSave,
@@ -66,8 +57,6 @@ function ProfileCard({
   isSaved,
   isSaving,
   isRemoving,
-  onLike,
-  onDislike,
 }: {
   profile: PartnerProfile;
   onSave?: (profile: PartnerProfile) => void;
@@ -75,8 +64,6 @@ function ProfileCard({
   isSaved?: boolean;
   isSaving?: boolean;
   isRemoving?: boolean;
-  onLike: (profile: PartnerProfile) => void;
-  onDislike: (profile: PartnerProfile) => void;
 }) {
   const initials = profile.name
     .split(" ")
@@ -104,9 +91,21 @@ function ProfileCard({
           )}
 
           <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/70 via-black/30 to-transparent p-4 text-white md:hidden">
-            <h3 className="text-xl font-semibold tracking-tight">
-              {profile.name}, {profile.age}
-            </h3>
+            <div className="flex items-center justify-between gap-2">
+              <h3 className="text-xl font-semibold tracking-tight">
+                {profile.name}, {profile.age}
+              </h3>
+              {onSave ? (
+                <button
+                  className="rounded-full border border-white/50 bg-black/30 px-2.5 py-1 text-xs font-medium text-white backdrop-blur-sm transition-colors hover:bg-black/50 disabled:cursor-not-allowed disabled:opacity-60"
+                  disabled={Boolean(isSaved) || Boolean(isSaving)}
+                  onClick={() => onSave(profile)}
+                  type="button"
+                >
+                  {isSaved ? "Saved" : isSaving ? "Saving..." : "Save"}
+                </button>
+              ) : null}
+            </div>
             <p className="mt-1 text-xs text-white/90 sm:text-sm">
               {profile.location} · {profile.occupation}
             </p>
@@ -120,9 +119,25 @@ function ProfileCard({
 
         <div className="space-y-3 px-4 py-4 sm:px-5 sm:py-5">
           <div className="hidden md:block">
-            <h3 className="text-2xl font-semibold tracking-tight text-zinc-900 dark:text-zinc-100">
-              {profile.name}, {profile.age}
-            </h3>
+            <div className="flex items-start justify-between gap-3">
+              <h3 className="text-2xl font-semibold tracking-tight text-zinc-900 dark:text-zinc-100">
+                {profile.name}, {profile.age}
+              </h3>
+              {onSave ? (
+                <button
+                  className="rounded-full border border-zinc-200 bg-white px-3 py-1 text-xs font-medium text-zinc-700 transition-colors hover:border-amber-300 hover:bg-amber-50 hover:text-amber-700 disabled:cursor-not-allowed disabled:opacity-60 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:border-amber-700 dark:hover:bg-amber-900/20 dark:hover:text-amber-300"
+                  disabled={Boolean(isSaved) || Boolean(isSaving)}
+                  onClick={() => onSave(profile)}
+                  type="button"
+                >
+                  {isSaved
+                    ? "⭐ Saved"
+                    : isSaving
+                      ? "Saving..."
+                      : "⭐ Save"}
+                </button>
+              ) : null}
+            </div>
             <p className="mt-1 text-xs text-zinc-500 sm:text-sm dark:text-zinc-400">
               {profile.location} · {profile.occupation}
             </p>
@@ -177,17 +192,6 @@ function ProfileCard({
           </div>
 
           <div className="flex flex-wrap justify-end gap-2 border-zinc-100 pt-1 md:border-t dark:border-zinc-800">
-            {onSave ? (
-              <button
-                className="flex items-center gap-1.5 rounded-full border border-zinc-200 bg-white px-4 py-1.5 text-sm font-medium text-zinc-700 transition-colors hover:border-amber-300 hover:bg-amber-50 hover:text-amber-700 disabled:cursor-not-allowed disabled:opacity-60 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:border-amber-700 dark:hover:bg-amber-900/20 dark:hover:text-amber-300"
-                disabled={Boolean(isSaved) || Boolean(isSaving)}
-                onClick={() => onSave(profile)}
-                type="button"
-              >
-                {isSaved ? "⭐ Saved" : isSaving ? "Saving..." : "⭐ Save match"}
-              </button>
-            ) : null}
-
             {onRemove ? (
               <button
                 className="flex items-center gap-1.5 rounded-full border border-zinc-200 bg-white px-4 py-1.5 text-sm font-medium text-zinc-700 transition-colors hover:border-zinc-400 hover:bg-zinc-100 disabled:cursor-not-allowed disabled:opacity-60 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:border-zinc-500 dark:hover:bg-zinc-700"
@@ -197,24 +201,7 @@ function ProfileCard({
               >
                 {isRemoving ? "Removing..." : "Remove"}
               </button>
-            ) : (
-              <>
-                <button
-                  className="flex items-center gap-1.5 rounded-full border border-zinc-200 bg-white px-4 py-1.5 text-sm font-medium text-zinc-700 transition-colors hover:border-red-300 hover:bg-red-50 hover:text-red-600 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:border-red-700 dark:hover:bg-red-900/20 dark:hover:text-red-400"
-                  onClick={() => onDislike(profile)}
-                  type="button"
-                >
-                  👎 Not for me
-                </button>
-                <button
-                  className="flex items-center gap-1.5 rounded-full border border-zinc-200 bg-white px-4 py-1.5 text-sm font-medium text-zinc-700 transition-colors hover:border-green-300 hover:bg-green-50 hover:text-green-600 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:border-green-700 dark:hover:bg-green-900/20 dark:hover:text-green-400"
-                  onClick={() => onLike(profile)}
-                  type="button"
-                >
-                  👍 This is promising
-                </button>
-              </>
-            )}
+            ) : null}
           </div>
         </div>
       </div>
@@ -539,7 +526,9 @@ export function ProfilesChatCards({
                   <button
                     className="rounded-full border border-zinc-200 px-2.5 py-1 hover:bg-zinc-100 disabled:opacity-50 dark:border-zinc-700 dark:hover:bg-zinc-800"
                     disabled={savedIndex === 0}
-                    onClick={() => setSavedIndex((index) => Math.max(0, index - 1))}
+                    onClick={() =>
+                      setSavedIndex((index) => Math.max(0, index - 1))
+                    }
                     type="button"
                   >
                     Prev
@@ -562,9 +551,9 @@ export function ProfilesChatCards({
               <ProfileCard
                 key={savedMatches[savedIndex].id}
                 isRemoving={removingMatchId === savedMatches[savedIndex].id}
-                onDislike={() => {}}
-                onLike={() => {}}
-                onRemove={() => handleRemoveSavedMatch(savedMatches[savedIndex].id)}
+                onRemove={() =>
+                  handleRemoveSavedMatch(savedMatches[savedIndex].id)
+                }
                 profile={savedMatches[savedIndex].profile}
               />
             </>
@@ -589,7 +578,9 @@ export function ProfilesChatCards({
                   <button
                     className="rounded-full border border-zinc-200 px-2.5 py-1 hover:bg-zinc-100 disabled:opacity-50 dark:border-zinc-700 dark:hover:bg-zinc-800"
                     disabled={currentIndex === 0}
-                    onClick={() => setCurrentIndex((index) => Math.max(0, index - 1))}
+                    onClick={() =>
+                      setCurrentIndex((index) => Math.max(0, index - 1))
+                    }
                     type="button"
                   >
                     Prev
@@ -642,14 +633,17 @@ export function ProfilesChatCards({
                 style={{ touchAction: "pan-y" }}
               >
                 <div
-                  className={isSwipeDragging ? "transition-none" : "transition-transform duration-200"}
+                  className={
+                    isSwipeDragging
+                      ? "transition-none"
+                      : "transition-transform duration-200"
+                  }
                   style={{
                     transform: `translateX(${swipeOffsetX}px) rotate(${swipeOffsetX / 25}deg)`,
                   }}
                 >
                   <ProfileCard
                     isSaved={
-                      !isAntiMatchType(profileSet.profiles[currentIndex].type) &&
                       savedProfileKeys.has(
                         `${documentId}:${profileSet.profiles[currentIndex].id}`,
                       )
@@ -658,13 +652,7 @@ export function ProfilesChatCards({
                       savingProfileId === profileSet.profiles[currentIndex].id
                     }
                     key={profileSet.profiles[currentIndex].id}
-                    onDislike={handleDislike}
-                    onLike={handleLike}
-                    onSave={
-                      isAntiMatchType(profileSet.profiles[currentIndex].type)
-                        ? undefined
-                        : handleSaveMatch
-                    }
+                    onSave={handleSaveMatch}
                     profile={profileSet.profiles[currentIndex]}
                   />
                 </div>
