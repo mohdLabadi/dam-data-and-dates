@@ -3,13 +3,11 @@
 import { useChat } from "@ai-sdk/react";
 import { DefaultChatTransport } from "ai";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useEffect, useRef, useState } from "react";
-import useSWR, { useSWRConfig } from "swr";
-import { unstable_serialize } from "swr/infinite";
+import { useEffect, useState } from "react";
+import useSWR from "swr";
 import { ChatHeader } from "@/components/chat-header";
 import { useArtifact, useArtifactSelector } from "@/hooks/use-artifact";
 import { useAutoResume } from "@/hooks/use-auto-resume";
-import { useChatVisibility } from "@/hooks/use-chat-visibility";
 import type { Vote } from "@/lib/db/schema";
 import { ChatbotError } from "@/lib/errors";
 import type { Attachment, ChatMessage } from "@/lib/types";
@@ -18,7 +16,6 @@ import { Artifact } from "./artifact";
 import { useDataStream } from "./data-stream-provider";
 import { Messages } from "./messages";
 import { MultimodalInput } from "./multimodal-input";
-import { getChatHistoryPaginationKey } from "./sidebar-history";
 import { toast } from "./toast";
 import type { VisibilityType } from "./visibility-selector";
 
@@ -40,13 +37,7 @@ export function Chat({
   initialProfileDocumentId?: string | null;
 }) {
   const router = useRouter();
-
-  const { visibilityType } = useChatVisibility({
-    chatId: id,
-    initialVisibilityType,
-  });
-
-  const { mutate } = useSWRConfig();
+  const visibilityType: VisibilityType = "private";
 
   // Handle browser back/forward navigation
   useEffect(() => {
@@ -61,12 +52,6 @@ export function Chat({
   const { setDataStream } = useDataStream();
 
   const [input, setInput] = useState<string>("");
-  const [currentModelId, setCurrentModelId] = useState(initialChatModel);
-  const currentModelIdRef = useRef(currentModelId);
-
-  useEffect(() => {
-    currentModelIdRef.current = currentModelId;
-  }, [currentModelId]);
 
   const {
     messages,
@@ -114,7 +99,7 @@ export function Chat({
             id: request.id,
             message: lastMessage,
             messages: request.messages,
-            selectedChatModel: currentModelIdRef.current,
+            selectedChatModel: initialChatModel,
             selectedVisibilityType: visibilityType,
             ...request.body,
           },
@@ -123,9 +108,6 @@ export function Chat({
     }),
     onData: (dataPart) => {
       setDataStream((ds) => (ds ? [...ds, dataPart] : []));
-    },
-    onFinish: () => {
-      mutate(unstable_serialize(getChatHistoryPaginationKey));
     },
     onError: (error) => {
       if (error instanceof ChatbotError) {
@@ -186,7 +168,7 @@ export function Chat({
 
   return (
     <>
-      <div className="overscroll-behavior-contain flex h-dvh min-w-0 touch-pan-y flex-col bg-background">
+      <div className="overscroll-behavior-contain flex h-dvh w-full min-w-0 flex-1 touch-pan-y flex-col bg-background">
         <ChatHeader
           chatId={id}
           isReadonly={isReadonly}
@@ -213,8 +195,7 @@ export function Chat({
               chatId={id}
               input={input}
               messages={messages}
-              onModelChange={setCurrentModelId}
-              selectedModelId={currentModelId}
+              selectedModelId={initialChatModel}
               selectedVisibilityType={visibilityType}
               sendMessage={sendMessage}
               setAttachments={setAttachments}
@@ -235,7 +216,7 @@ export function Chat({
         isReadonly={isReadonly}
         messages={messages}
         regenerate={regenerate}
-        selectedModelId={currentModelId}
+        selectedModelId={initialChatModel}
         selectedVisibilityType={visibilityType}
         sendMessage={sendMessage}
         setAttachments={setAttachments}

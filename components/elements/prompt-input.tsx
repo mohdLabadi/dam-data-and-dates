@@ -27,6 +27,7 @@ export const PromptInput = ({ className, ...props }: PromptInputProps) => (
       "w-full overflow-hidden rounded-xl border bg-background shadow-xs",
       className
     )}
+    suppressHydrationWarning
     {...props}
   />
 );

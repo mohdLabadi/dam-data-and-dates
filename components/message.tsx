@@ -17,8 +17,6 @@ import {
   ToolOutput,
 } from "./elements/tool";
 import { SparklesIcon } from "./icons";
-import { MessageActions } from "./message-actions";
-import { MessageEditor } from "./message-editor";
 import { MessageReasoning } from "./message-reasoning";
 import { PreviewAttachment } from "./preview-attachment";
 import { Weather } from "./weather";
@@ -378,16 +376,6 @@ const PurePreviewMessage = ({
               </div>
             )}
 
-          {!isReadonly && (
-            <MessageActions
-              chatId={chatId}
-              isLoading={isLoading}
-              key={`action-${message.id}`}
-              message={message}
-              setMode={setMode}
-              vote={vote}
-            />
-          )}
         </div>
       </div>
     </div>
