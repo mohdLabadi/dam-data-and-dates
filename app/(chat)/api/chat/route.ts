@@ -19,7 +19,7 @@ import { generateProfiles } from "@/lib/ai/tools/generate-profiles";
 import { getWeather } from "@/lib/ai/tools/get-weather";
 import { requestSuggestions } from "@/lib/ai/tools/request-suggestions";
 import { updateDocument } from "@/lib/ai/tools/update-document";
-import { isProductionEnvironment } from "@/lib/constants";
+import { INTAKE_MESSAGE_PREFIX, isProductionEnvironment } from "@/lib/constants";
 import {
   createStreamId,
   deleteChatById,
@@ -133,13 +133,55 @@ function getUserTextFromMessages(messages: ChatMessage[]) {
     .filter((text): text is string => Boolean(text && text.trim().length > 0));
 }
 
+function stripIntakePrefix(text: string) {
+  return text.startsWith(INTAKE_MESSAGE_PREFIX)
+    ? text.slice(INTAKE_MESSAGE_PREFIX.length)
+    : text;
+}
+
+function normalizeIntakeMessageForModel(message: ChatMessage | undefined) {
+  if (!message || message.role !== "user") {
+    return message;
+  }
+
+  return {
+    ...message,
+    parts: message.parts.map((part) => {
+      if (part.type !== "text") {
+        return part;
+      }
+
+      return {
+        ...part,
+        text: stripIntakePrefix(part.text),
+      };
+    }),
+  };
+}
+
+function hasIntakePrefix(message: ChatMessage | undefined) {
+  if (!message || message.role !== "user") {
+    return false;
+  }
+
+  return message.parts.some(
+    (part) => part.type === "text" && part.text.startsWith(INTAKE_MESSAGE_PREFIX),
+  );
+}
+
 function buildMatchmakingRuntimeGuidance({
   uiMessages,
   canUseTools,
+  forceGenerateProfiles,
 }: {
   uiMessages: ChatMessage[];
   canUseTools: boolean;
+  forceGenerateProfiles?: boolean;
 }) {
+  if (forceGenerateProfiles && canUseTools) {
+    return `\n\nRuntime conversation guidance:\n- The user just completed an intake form and is ready for immediate results.\n- Start with one short line of acknowledgment in a warm tone, e.g. \"Thanks for sharing - I generated profiles based on your preferences.\"\n- Then call generateProfiles now without asking additional intake questions.`;
+  }
+
   const userTexts = getUserTextFromMessages(uiMessages);
 
   if (userTexts.length === 0) {
@@ -187,7 +229,14 @@ export async function POST(request: Request) {
   }
 
   try {
-    const { id, message, messages, selectedChatModel, selectedVisibilityType } =
+    const {
+      id,
+      message,
+      messages,
+      selectedChatModel,
+      selectedVisibilityType,
+      forceGenerateProfiles,
+    } =
       requestBody;
     const resolvedChatModel = resolveChatModelId(selectedChatModel);
 
@@ -213,6 +262,12 @@ export async function POST(request: Request) {
     const incomingMessages = Array.isArray(messages)
       ? (messages as ChatMessage[])
       : undefined;
+    const normalizedMessage = normalizeIntakeMessageForModel(
+      message as ChatMessage | undefined,
+    );
+    const isHiddenIntakeSubmission = hasIntakePrefix(
+      message as ChatMessage | undefined,
+    );
     const isToolApprovalFlow = isToolApprovalFlowMessageSet(incomingMessages);
 
     const chat = hasDatabase ? await getChatById({ id }) : null;
@@ -226,7 +281,7 @@ export async function POST(request: Request) {
       if (!isToolApprovalFlow && hasDatabase) {
         messagesFromDb = await getMessagesByChatId({ id });
       }
-    } else if (message?.role === "user") {
+    } else if (normalizedMessage?.role === "user") {
       if (hasDatabase) {
         await saveChat({
           id,
@@ -235,9 +290,10 @@ export async function POST(request: Request) {
           visibility: selectedVisibilityType,
         });
       }
-      titlePromise = hasDatabase
-        ? generateTitleFromUserMessage({ message })
-        : null;
+      titlePromise =
+        hasDatabase && !isHiddenIntakeSubmission
+          ? generateTitleFromUserMessage({ message: normalizedMessage })
+          : null;
     }
 
     const uiMessages =
@@ -245,7 +301,7 @@ export async function POST(request: Request) {
         ? incomingMessages
         : isToolApprovalFlow
           ? (incomingMessages ?? [])
-          : [...convertToUIMessages(messagesFromDb), message as ChatMessage];
+          : [...convertToUIMessages(messagesFromDb), normalizedMessage as ChatMessage];
 
     const { longitude, latitude, city, country } = geolocation(request);
 
@@ -256,15 +312,15 @@ export async function POST(request: Request) {
       country,
     };
 
-    if (message?.role === "user") {
+    if (normalizedMessage?.role === "user" && !isHiddenIntakeSubmission) {
       if (hasDatabase) {
         await saveMessages({
           messages: [
             {
               chatId: id,
-              id: message.id,
+              id: normalizedMessage.id,
               role: "user",
-              parts: message.parts,
+              parts: normalizedMessage.parts,
               attachments: [],
               createdAt: new Date(),
             },
@@ -285,12 +341,17 @@ export async function POST(request: Request) {
           "createDocument",
           "updateDocument",
           "requestSuggestions",
-          ...(modelMessages.length >= 3 ? (["generateProfiles"] as const) : []),
+          ...(
+            modelMessages.length >= 3 || forceGenerateProfiles
+              ? (["generateProfiles"] as const)
+              : []
+          ),
         ];
 
     const runtimeGuidance = buildMatchmakingRuntimeGuidance({
       uiMessages,
       canUseTools: !isReasoningModel,
+      forceGenerateProfiles,
     });
 
     const stream = createUIMessageStream({

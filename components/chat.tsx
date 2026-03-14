@@ -3,17 +3,19 @@
 import { useChat } from "@ai-sdk/react";
 import { DefaultChatTransport } from "ai";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import useSWR from "swr";
 import { ChatHeader } from "@/components/chat-header";
 import { useArtifact, useArtifactSelector } from "@/hooks/use-artifact";
 import { useAutoResume } from "@/hooks/use-auto-resume";
+import { INTAKE_MESSAGE_PREFIX } from "@/lib/constants";
 import type { Vote } from "@/lib/db/schema";
 import { ChatbotError } from "@/lib/errors";
 import type { Attachment, ChatMessage } from "@/lib/types";
 import { fetcher, fetchWithErrorHandlers, generateUUID } from "@/lib/utils";
 import { Artifact } from "./artifact";
 import { useDataStream } from "./data-stream-provider";
+import { IntakeForm } from "./intake-form";
 import { Messages } from "./messages";
 import { MultimodalInput } from "./multimodal-input";
 import { toast } from "./toast";
@@ -38,6 +40,7 @@ export function Chat({
 }) {
   const router = useRouter();
   const visibilityType: VisibilityType = "private";
+  const forceGenerateProfilesRef = useRef(false);
 
   // Handle browser back/forward navigation
   useEffect(() => {
@@ -52,6 +55,9 @@ export function Chat({
   const { setDataStream } = useDataStream();
 
   const [input, setInput] = useState<string>("");
+  const [hasCompletedIntake, setHasCompletedIntake] = useState(
+    initialMessages.length > 0,
+  );
 
   const {
     messages,
@@ -101,6 +107,11 @@ export function Chat({
             messages: request.messages,
             selectedChatModel: initialChatModel,
             selectedVisibilityType: visibilityType,
+            forceGenerateProfiles: (() => {
+              const shouldForce = forceGenerateProfilesRef.current;
+              forceGenerateProfilesRef.current = false;
+              return shouldForce;
+            })(),
             ...request.body,
           },
         };
@@ -126,6 +137,7 @@ export function Chat({
 
   useEffect(() => {
     if (query && !hasAppendedQuery) {
+      setHasCompletedIntake(true);
       sendMessage({
         role: "user" as const,
         parts: [{ type: "text", text: query }],
@@ -166,6 +178,36 @@ export function Chat({
     setMessages,
   });
 
+  const showIntakeForm =
+    !isReadonly && !hasCompletedIntake && messages.length === 0 && !query;
+
+  const handleIntakeSubmit = (prompt: string) => {
+    setHasCompletedIntake(true);
+    forceGenerateProfilesRef.current = true;
+    window.history.pushState({}, "", `/chat/${id}`);
+    sendMessage({
+      role: "user",
+      parts: [{ type: "text", text: `${INTAKE_MESSAGE_PREFIX}${prompt}` }],
+    });
+
+    // Keep intake payload out of visible chat history while still allowing backend generation.
+    setTimeout(() => {
+      setMessages((current) =>
+        current.filter(
+          (message) =>
+            !(
+              message.role === "user" &&
+              message.parts.some(
+                (part) =>
+                  part.type === "text" &&
+                  part.text.startsWith(INTAKE_MESSAGE_PREFIX),
+              )
+            ),
+        ),
+      );
+    }, 0);
+  };
+
   return (
     <>
       <div className="overscroll-behavior-contain flex h-dvh w-full min-w-0 flex-1 touch-pan-y flex-col bg-background">
@@ -175,21 +217,28 @@ export function Chat({
           selectedVisibilityType={initialVisibilityType}
         />
 
-        <Messages
-          addToolApprovalResponse={addToolApprovalResponse}
-          chatId={id}
-          isArtifactVisible={isArtifactVisible}
-          isReadonly={isReadonly}
-          messages={messages}
-          regenerate={regenerate}
-          selectedModelId={initialChatModel}
-          setMessages={setMessages}
-          status={status}
-          votes={votes}
-        />
+        {showIntakeForm ? (
+          <IntakeForm
+            isSubmitting={status !== "ready"}
+            onSubmit={handleIntakeSubmit}
+          />
+        ) : (
+          <Messages
+            addToolApprovalResponse={addToolApprovalResponse}
+            chatId={id}
+            isArtifactVisible={isArtifactVisible}
+            isReadonly={isReadonly}
+            messages={messages}
+            regenerate={regenerate}
+            selectedModelId={initialChatModel}
+            setMessages={setMessages}
+            status={status}
+            votes={votes}
+          />
+        )}
 
         <div className="sticky bottom-0 z-1 mx-auto flex w-full max-w-4xl gap-2 border-t-0 bg-background px-2 pb-3 md:px-4 md:pb-4">
-          {!isReadonly && (
+          {!isReadonly && !showIntakeForm && (
             <MultimodalInput
               attachments={attachments}
               chatId={id}

@@ -10,4 +10,6 @@ export const isTestEnvironment = Boolean(
 
 export const guestRegex = /^guest-\d+$/;
 
+export const INTAKE_MESSAGE_PREFIX = "__INTAKE_FORM__::";
+
 export const DUMMY_PASSWORD = generateDummyPassword();

@@ -1,6 +1,7 @@
 import type { UseChatHelpers } from "@ai-sdk/react";
 import { ArrowDownIcon } from "lucide-react";
 import { useMessages } from "@/hooks/use-messages";
+import { INTAKE_MESSAGE_PREFIX } from "@/lib/constants";
 import type { Vote } from "@/lib/db/schema";
 import type { ChatMessage } from "@/lib/types";
 import { useDataStream } from "./data-stream-provider";
@@ -31,6 +32,23 @@ function PureMessages({
   isReadonly,
   selectedModelId: _selectedModelId,
 }: MessagesProps) {
+  const isHiddenIntakeMessage = (message: ChatMessage) => {
+    if (message.role !== "user") {
+      return false;
+    }
+
+    return message.parts.some(
+      (part) =>
+        part.type === "text" &&
+        (part.text.startsWith(INTAKE_MESSAGE_PREFIX) ||
+          part.text.includes(`${INTAKE_MESSAGE_PREFIX}I completed your dating intake form.`)),
+    );
+  };
+
+  const visibleMessages = messages.filter((message) => {
+    return !isHiddenIntakeMessage(message);
+  });
+
   const {
     containerRef: messagesContainerRef,
     endRef: messagesEndRef,
@@ -50,21 +68,21 @@ function PureMessages({
         ref={messagesContainerRef}
       >
         <div className="mx-auto flex min-w-0 max-w-4xl flex-col gap-4 px-2 py-4 md:gap-6 md:px-4">
-          {messages.length === 0 && <Greeting />}
+          {visibleMessages.length === 0 && <Greeting />}
 
-          {messages.map((message, index) => (
+          {visibleMessages.map((message, index) => (
             <PreviewMessage
               addToolApprovalResponse={addToolApprovalResponse}
               chatId={chatId}
               isLoading={
-                status === "streaming" && messages.length - 1 === index
+                status === "streaming" && visibleMessages.length - 1 === index
               }
               isReadonly={isReadonly}
               key={message.id}
               message={message}
               regenerate={regenerate}
               requiresScrollPadding={
-                hasSentMessage && index === messages.length - 1
+                hasSentMessage && index === visibleMessages.length - 1
               }
               setMessages={setMessages}
               vote={
