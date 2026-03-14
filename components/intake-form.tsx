@@ -1,7 +1,7 @@
 "use client";
 
 import { X } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -235,6 +235,11 @@ export function IntakeForm({
   isSubmitting: boolean;
 }) {
   const [values, setValues] = useState<IntakeValues>(initialValues);
+  const [isMounted, setIsMounted] = useState(false);
+
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
 
   const canSubmit = useMemo(() => {
     const age = Number(values.age);
@@ -257,6 +262,21 @@ export function IntakeForm({
       values.partnerQualities.length > 0,
     );
   }, [values]);
+
+  if (!isMounted) {
+    return (
+      <div className="mx-auto w-full max-w-5xl px-3 pb-6 pt-4 md:px-4">
+        <Card className="border-border/80">
+          <CardHeader className="bg-muted/40 pb-4">
+            <CardTitle className="text-xl md:text-2xl">
+              Build your dating profile
+            </CardTitle>
+            <CardDescription>Loading your intake form...</CardDescription>
+          </CardHeader>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div className="mx-auto w-full max-w-5xl px-3 pb-6 pt-4 md:px-4">

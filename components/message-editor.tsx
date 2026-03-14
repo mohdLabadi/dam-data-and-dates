@@ -15,7 +15,7 @@ import { getTextFromMessage } from "@/lib/utils";
 import { Button } from "./ui/button";
 import { Textarea } from "./ui/textarea";
 
-export type MessageEditorProps = {
+type MessageEditorProps = {
   message: ChatMessage;
   setMode: Dispatch<SetStateAction<"view" | "edit">>;
   setMessages: UseChatHelpers<ChatMessage>["setMessages"];

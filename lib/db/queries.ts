@@ -601,23 +601,6 @@ export async function deleteMessagesByChatIdAfterTimestamp({
   }
 }
 
-export async function updateChatVisibilityById({
-  chatId,
-  visibility,
-}: {
-  chatId: string;
-  visibility: "private" | "public";
-}) {
-  try {
-    return await db.update(chat).set({ visibility }).where(eq(chat.id, chatId));
-  } catch (_error) {
-    throw new ChatbotError(
-      "bad_request:database",
-      "Failed to update chat visibility by id"
-    );
-  }
-}
-
 export async function updateChatTitleById({
   chatId,
   title,
@@ -686,20 +669,3 @@ export async function createStreamId({
   }
 }
 
-export async function getStreamIdsByChatId({ chatId }: { chatId: string }) {
-  try {
-    const streamIds = await db
-      .select({ id: stream.id })
-      .from(stream)
-      .where(eq(stream.chatId, chatId))
-      .orderBy(asc(stream.createdAt))
-      .execute();
-
-    return streamIds.map(({ id }) => id);
-  } catch (_error) {
-    throw new ChatbotError(
-      "bad_request:database",
-      "Failed to get stream ids by chat id"
-    );
-  }
-}

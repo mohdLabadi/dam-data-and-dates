@@ -8,9 +8,7 @@ import type { requestSuggestions } from "./ai/tools/request-suggestions";
 import type { updateDocument } from "./ai/tools/update-document";
 import type { Suggestion } from "./db/schema";
 
-export type DataPart = { type: "append-message"; message: string };
-
-export const messageMetadataSchema = z.object({
+const messageMetadataSchema = z.object({
   createdAt: z.string(),
 });
 

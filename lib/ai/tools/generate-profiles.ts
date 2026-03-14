@@ -146,6 +146,30 @@ function ensureAntiMatchProfile(
   });
 }
 
+function parseProfileSetFromJson(input: string): ProfileSet | null {
+  try {
+    const parsed = JSON.parse(input) as Partial<ProfileSet>;
+
+    if (!Array.isArray(parsed.profiles)) {
+      return null;
+    }
+
+    return {
+      profiles: parsed.profiles as PartnerProfile[],
+      generatedAt:
+        typeof parsed.generatedAt === "string"
+          ? parsed.generatedAt
+          : new Date().toISOString(),
+      preferencesSummary:
+        typeof parsed.preferencesSummary === "string"
+          ? parsed.preferencesSummary
+          : "",
+    };
+  } catch {
+    return null;
+  }
+}
+
 export const generateProfiles = ({
   session,
   dataStream,
@@ -245,6 +269,7 @@ export const generateProfiles = ({
     }),
     execute: async ({ preferences }) => {
       const id = generateUUID();
+      let profileSet: ProfileSet | null = null;
 
       // Signal artifact panel to open with profiles kind
       dataStream.write({ type: "data-kind", data: "profiles", transient: true });
@@ -306,11 +331,14 @@ export const generateProfiles = ({
               null,
               2
             );
+            profileSet = parseProfileSetFromJson(profilesJson);
           } else {
             profilesJson = cleaned;
+            profileSet = parseProfileSetFromJson(cleaned);
           }
         } catch {
           profilesJson = cleaned;
+          profileSet = parseProfileSetFromJson(cleaned);
         }
 
         // Stream the generated JSON to the artifact
@@ -351,6 +379,9 @@ export const generateProfiles = ({
 
       return {
         documentId: id,
+        profileSet,
+        profiles: profileSet?.profiles,
+        preferencesSummary: profileSet?.preferencesSummary,
         message:
           "I've generated 4 partner profiles based on your preferences, including one intentional anti-match for comparison. You can see them in the panel on the right. Click 👍 or 👎 on any profile to refine your matches, or tell me what you'd like to adjust.",
       };

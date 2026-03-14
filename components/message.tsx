@@ -2,6 +2,7 @@
 import type { UseChatHelpers } from "@ai-sdk/react";
 import { useState } from "react";
 import type { Vote } from "@/lib/db/schema";
+import type { PartnerProfile } from "@/lib/ai/preference-schema";
 import type { ChatMessage } from "@/lib/types";
 import { cn, sanitizeText } from "@/lib/utils";
 import { useDataStream } from "./data-stream-provider";
@@ -17,6 +18,7 @@ import {
   ToolOutput,
 } from "./elements/tool";
 import { SparklesIcon } from "./icons";
+import { MessageEditor } from "./message-editor";
 import { MessageReasoning } from "./message-reasoning";
 import { PreviewAttachment } from "./preview-attachment";
 import { Weather } from "./weather";
@@ -24,14 +26,72 @@ import { Weather } from "./weather";
 const EMPTY_ASSISTANT_FALLBACK_TEXT =
   "I couldn't generate a response for that request. Please try again.";
 
+function InlineMatchCard({
+  profile,
+  onLike,
+  onDislike,
+}: {
+  profile: PartnerProfile;
+  onLike: (profile: PartnerProfile) => void;
+  onDislike: (profile: PartnerProfile) => void;
+}) {
+  const traits = Array.isArray(profile.traits) ? profile.traits : [];
+
+  return (
+    <div className="mb-4 rounded-xl border border-border bg-card p-4">
+      <div className="mb-2 flex items-center justify-between">
+        <h3 className="font-semibold text-base">
+          {profile.name}, {profile.age}
+        </h3>
+        <span className="text-muted-foreground text-sm">
+          {profile.compatibilityScore}%
+        </span>
+      </div>
+      <p className="mb-2 text-muted-foreground text-sm">
+        {profile.location} · {profile.occupation}
+      </p>
+      <p className="mb-3 text-sm">{profile.bio}</p>
+      {traits.length > 0 && (
+        <div className="mb-3 flex flex-wrap gap-2">
+          {traits.slice(0, 5).map((trait) => (
+            <span
+              className="rounded-full bg-muted px-2 py-0.5 text-xs"
+              key={trait}
+            >
+              {trait}
+            </span>
+          ))}
+        </div>
+      )}
+      <div className="flex justify-end gap-2">
+        <button
+          className="rounded-md border px-3 py-1.5 text-sm hover:bg-muted"
+          onClick={() => onDislike(profile)}
+          type="button"
+        >
+          👎 Not for me
+        </button>
+        <button
+          className="rounded-md border px-3 py-1.5 text-sm hover:bg-muted"
+          onClick={() => onLike(profile)}
+          type="button"
+        >
+          👍 This is promising
+        </button>
+      </div>
+    </div>
+  );
+}
+
 const PurePreviewMessage = ({
   addToolApprovalResponse,
-  chatId,
+  chatId: _chatId,
   message,
-  vote,
+  vote: _vote,
   isLoading,
   setMessages,
   regenerate,
+  sendMessage,
   isReadonly,
   requiresScrollPadding: _requiresScrollPadding,
 }: {
@@ -42,6 +102,7 @@ const PurePreviewMessage = ({
   isLoading: boolean;
   setMessages: UseChatHelpers<ChatMessage>["setMessages"];
   regenerate: UseChatHelpers<ChatMessage>["regenerate"];
+  sendMessage?: UseChatHelpers<ChatMessage>["sendMessage"];
   isReadonly: boolean;
   requiresScrollPadding: boolean;
 }) => {
@@ -119,12 +180,18 @@ const PurePreviewMessage = ({
           )}
 
           {message.parts?.map((part, index) => {
+            if (!part || typeof part !== "object") {
+              return null;
+            }
+
             const { type } = part;
             const key = `message-${message.id}-part-${index}`;
 
             if (type === "reasoning") {
               const hasContent = part.text?.trim().length > 0;
-              const isStreaming = "state" in part && part.state === "streaming";
+              const isStreaming =
+                "state" in part &&
+                (part as { state?: string }).state === "streaming";
               if (hasContent || isStreaming) {
                 return (
                   <MessageReasoning
@@ -154,11 +221,16 @@ const PurePreviewMessage = ({
                           : undefined
                       }
                     >
-                      <Response>{sanitizeText(
-                        message.role === "user"
-                          ? part.text.replace(/\s*Use updateDocument with id [a-f0-9-]+\.?/g, "")
-                          : part.text
-                      )}</Response>
+                      <Response>
+                        {sanitizeText(
+                          message.role === "user"
+                            ? part.text.replace(
+                                /\s*Use updateDocument with id [a-f0-9-]+\.?/g,
+                                "",
+                              )
+                            : part.text,
+                        )}
+                      </Response>
                     </MessageContent>
                   </div>
                 );
@@ -279,6 +351,102 @@ const PurePreviewMessage = ({
               );
             }
 
+            if (type === "tool-generateProfiles") {
+              const { toolCallId, state } = part;
+
+              if (state !== "output-available") {
+                return (
+                  <div
+                    className="flex h-24 items-center justify-center"
+                    key={toolCallId}
+                  >
+                    <div className="text-center">
+                      <div className="mb-2 text-3xl">💘</div>
+                      <p className="text-sm text-muted-foreground">
+                        Crafting your matches...
+                      </p>
+                    </div>
+                  </div>
+                );
+              }
+
+              const rawOutput = (part as { output?: unknown }).output as
+                | {
+                    profileSet?: {
+                      profiles?: PartnerProfile[];
+                      preferencesSummary?: string;
+                    };
+                    profiles?: PartnerProfile[];
+                    preferencesSummary?: string;
+                    message?: string;
+                  }
+                | undefined;
+
+              const profileSet =
+                rawOutput?.profileSet ??
+                (rawOutput?.profiles
+                  ? {
+                      profiles: rawOutput.profiles,
+                      preferencesSummary: rawOutput.preferencesSummary,
+                    }
+                  : null);
+
+              if (!profileSet?.profiles?.length) {
+                return (
+                  <div
+                    className="rounded-lg border border-dashed border-border p-4 text-sm text-muted-foreground"
+                    key={toolCallId}
+                  >
+                    <p className="mb-2">
+                      {rawOutput?.message ??
+                        "Matches were generated, but no profile cards were returned in the expected format."}
+                    </p>
+                    <pre className="overflow-x-auto rounded bg-muted p-2 text-xs">
+                      {JSON.stringify(rawOutput ?? {}, null, 2)}
+                    </pre>
+                  </div>
+                );
+              }
+
+              return (
+                <div className="w-full" key={toolCallId}>
+                  {profileSet.preferencesSummary && (
+                    <p className="mb-4 text-sm text-muted-foreground">
+                      {profileSet.preferencesSummary}
+                    </p>
+                  )}
+                  {profileSet.profiles.map((profile) => (
+                    <InlineMatchCard
+                      key={profile.id}
+                      profile={profile}
+                      onLike={(p) =>
+                        sendMessage?.({
+                          role: "user",
+                          parts: [
+                            {
+                              type: "text",
+                              text: `I liked ${p.name}'s profile (${p.type.replace("_", " ")}). Their traits that stood out: ${p.traits.slice(0, 3).join(", ")}. Please regenerate all four profiles with more matches like this one.`,
+                            },
+                          ],
+                        })
+                      }
+                      onDislike={(p) =>
+                        sendMessage?.({
+                          role: "user",
+                          parts: [
+                            {
+                              type: "text",
+                              text: `I didn't connect with ${p.name}'s profile. Please regenerate all four profiles and avoid the qualities that made this one feel off.`,
+                            },
+                          ],
+                        })
+                      }
+                    />
+                  ))}
+                </div>
+              );
+            }
+
             if (type === "tool-createDocument") {
               const { toolCallId } = part;
 
@@ -376,6 +544,7 @@ const PurePreviewMessage = ({
               </div>
             )}
 
+          {/* Message actions (copy/like/dislike) removed for profile interface */}
         </div>
       </div>
     </div>

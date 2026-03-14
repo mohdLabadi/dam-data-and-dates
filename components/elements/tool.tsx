@@ -18,7 +18,7 @@ import {
 } from "@/components/ui/collapsible";
 import { cn } from "@/lib/utils";
 
-export type ToolProps = ComponentProps<typeof Collapsible>;
+type ToolProps = ComponentProps<typeof Collapsible>;
 
 export const Tool = ({ className, ...props }: ToolProps) => (
   <Collapsible
@@ -27,7 +27,7 @@ export const Tool = ({ className, ...props }: ToolProps) => (
   />
 );
 
-export type ToolHeaderProps = {
+type ToolHeaderProps = {
   type: ToolUIPart["type"];
   state: ToolUIPart["state"];
   className?: string;
@@ -89,7 +89,7 @@ export const ToolHeader = ({
   </CollapsibleTrigger>
 );
 
-export type ToolContentProps = ComponentProps<typeof CollapsibleContent>;
+type ToolContentProps = ComponentProps<typeof CollapsibleContent>;
 
 export const ToolContent = ({ className, ...props }: ToolContentProps) => (
   <CollapsibleContent
@@ -101,7 +101,7 @@ export const ToolContent = ({ className, ...props }: ToolContentProps) => (
   />
 );
 
-export type ToolInputProps = ComponentProps<"div"> & {
+type ToolInputProps = ComponentProps<"div"> & {
   input: ToolUIPart["input"];
 };
 
@@ -116,7 +116,7 @@ export const ToolInput = ({ className, input, ...props }: ToolInputProps) => (
   </div>
 );
 
-export type ToolOutputProps = ComponentProps<"div"> & {
+type ToolOutputProps = ComponentProps<"div"> & {
   output: ReactNode;
   errorText: ToolUIPart["errorText"];
 };

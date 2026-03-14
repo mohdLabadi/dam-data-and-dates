@@ -16,9 +16,9 @@ import { guestRegex } from "@/lib/constants";
 import type { VisibilityType } from "./visibility-selector";
 
 function PureChatHeader({
-  chatId,
-  selectedVisibilityType,
-  isReadonly,
+  chatId: _chatId,
+  selectedVisibilityType: _selectedVisibilityType,
+  isReadonly: _isReadonly,
 }: {
   chatId: string;
   selectedVisibilityType: VisibilityType;

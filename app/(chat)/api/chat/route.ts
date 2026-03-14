@@ -8,7 +8,7 @@ import {
   streamText,
 } from "ai";
 import { after } from "next/server";
-import { createResumableStreamContext } from "resumable-stream";
+import { createResumableStreamContext } from "resumable-stream/generic";
 import { auth, type UserType } from "@/app/(auth)/auth";
 import { entitlementsByUserType } from "@/lib/ai/entitlements";
 import { resolveChatModelId } from "@/lib/ai/models";
@@ -353,6 +353,10 @@ export async function POST(request: Request) {
       canUseTools: !isReasoningModel,
       forceGenerateProfiles,
     });
+    const forcedToolChoice =
+      forceGenerateProfiles && !isReasoningModel
+        ? ({ type: "tool", toolName: "generateProfiles" } as const)
+        : undefined;
 
     const stream = createUIMessageStream({
       originalMessages: isToolApprovalFlow ? uiMessages : undefined,
@@ -363,6 +367,7 @@ export async function POST(request: Request) {
           system: `${systemPrompt({ selectedChatModel: resolvedChatModel, requestHints })}${runtimeGuidance}`,
           messages: modelMessages,
           stopWhen: stepCountIs(5),
+          toolChoice: forcedToolChoice,
           experimental_activeTools: activeTools,
           providerOptions: isReasoningModel
             ? {

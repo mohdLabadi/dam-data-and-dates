@@ -77,10 +77,13 @@ export function Chat({
       const shouldContinue =
         lastMessage?.parts?.some(
           (part) =>
+            Boolean(part) &&
+            typeof part === "object" &&
             "state" in part &&
-            part.state === "approval-responded" &&
+            (part as { state?: string }).state === "approval-responded" &&
             "approval" in part &&
-            (part.approval as { approved?: boolean })?.approved === true,
+            ((part as { approval?: { approved?: boolean } }).approval
+              ?.approved ?? false) === true,
         ) ?? false;
       return shouldContinue;
     },
@@ -89,17 +92,6 @@ export function Chat({
       fetch: fetchWithErrorHandlers,
       prepareSendMessagesRequest(request) {
         const lastMessage = request.messages.at(-1);
-        const isToolApprovalContinuation =
-          lastMessage?.role !== "user" ||
-          request.messages.some((msg) =>
-            msg.parts?.some((part) => {
-              const state = (part as { state?: string }).state;
-              return (
-                state === "approval-responded" || state === "output-denied"
-              );
-            }),
-          );
-
         return {
           body: {
             id: request.id,

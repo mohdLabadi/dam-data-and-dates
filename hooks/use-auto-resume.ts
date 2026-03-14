@@ -5,7 +5,7 @@ import { useEffect } from "react";
 import { useDataStream } from "@/components/data-stream-provider";
 import type { ChatMessage } from "@/lib/types";
 
-export type UseAutoResumeParams = {
+type UseAutoResumeParams = {
   autoResume: boolean;
   initialMessages: ChatMessage[];
   resumeStream: UseChatHelpers<ChatMessage>["resumeStream"];

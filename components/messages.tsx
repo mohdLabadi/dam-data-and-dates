@@ -99,7 +99,10 @@ function PureMessages({
             !messages.some((msg) =>
               msg.parts?.some(
                 (part) =>
-                  "state" in part && part.state === "approval-responded",
+                  Boolean(part) &&
+                  typeof part === "object" &&
+                  "state" in part &&
+                  (part as { state?: string }).state === "approval-responded",
               ),
             ) && <ThinkingMessage />}
 

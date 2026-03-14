@@ -1,9 +1,9 @@
 // Curated list of supported Google models
 export const DEFAULT_CHAT_MODEL = "google/gemini-2.5-flash-lite";
-export const GOOGLE_MODEL_QUOTA_EXHAUSTED = "google/gemini-2.5-flash-lite";
-export const GOOGLE_MODEL_FALLBACK = "google/gemini-2.5-flash-lite";
+const GOOGLE_MODEL_QUOTA_EXHAUSTED = "google/gemini-2.5-flash-lite";
+const GOOGLE_MODEL_FALLBACK = "google/gemini-2.5-flash-lite";
 
-export type ChatModel = {
+type ChatModel = {
   id: string;
   name: string;
   provider: string;
@@ -25,19 +25,7 @@ const allChatModels: ChatModel[] = [
   },
 ];
 
-export const chatModels: ChatModel[] = allChatModels;
-
-// Group models by provider for UI
-export const modelsByProvider = chatModels.reduce(
-  (acc, model) => {
-    if (!acc[model.provider]) {
-      acc[model.provider] = [];
-    }
-    acc[model.provider].push(model);
-    return acc;
-  },
-  {} as Record<string, ChatModel[]>
-);
+const chatModels: ChatModel[] = allChatModels;
 
 export function resolveChatModelId(modelId?: string) {
   if (!modelId) {

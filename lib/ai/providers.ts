@@ -1,9 +1,7 @@
 import { createGoogleGenerativeAI } from "@ai-sdk/google";
 import {
-  customProvider,
   type ImageModel,
 } from "ai";
-import { isTestEnvironment } from "../constants";
 
 const DEFAULT_DIRECT_GOOGLE_MODEL = "gemini-2.5-flash-lite";
 const DEFAULT_DIRECT_GOOGLE_IMAGE_MODEL = "gemini-2.5-flash-image";
@@ -40,38 +38,11 @@ function getLanguageModelFromConfiguredProvider(modelId: string) {
   throw new Error("Missing AI provider credentials. Set GOOGLE_GENERATIVE_AI_API_KEY.");
 }
 
-export const myProvider = isTestEnvironment
-  ? (() => {
-      const {
-        artifactModel,
-        chatModel,
-        reasoningModel,
-        titleModel,
-      } = require("./models.mock");
-      return customProvider({
-        languageModels: {
-          "chat-model": chatModel,
-          "chat-model-reasoning": reasoningModel,
-          "title-model": titleModel,
-          "artifact-model": artifactModel,
-        },
-      });
-    })()
-  : null;
-
 export function getLanguageModel(modelId: string) {
-  if (isTestEnvironment && myProvider) {
-    return myProvider.languageModel(modelId);
-  }
-
   return getLanguageModelFromConfiguredProvider(modelId);
 }
 
 export function getTitleModel() {
-  if (isTestEnvironment && myProvider) {
-    return myProvider.languageModel("title-model");
-  }
-
   if (google) {
     return google(DEFAULT_DIRECT_GOOGLE_MODEL);
   }
@@ -80,10 +51,6 @@ export function getTitleModel() {
 }
 
 export function getArtifactModel() {
-  if (isTestEnvironment && myProvider) {
-    return myProvider.languageModel("artifact-model");
-  }
-
   if (google) {
     return google(DEFAULT_DIRECT_GOOGLE_MODEL);
   }

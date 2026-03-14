@@ -7,32 +7,24 @@ import type {
   HTMLAttributes,
   KeyboardEventHandler,
 } from "react";
-import { Children } from "react";
 import { Button } from "@/components/ui/button";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 
-export type PromptInputProps = HTMLAttributes<HTMLFormElement>;
+type PromptInputProps = HTMLAttributes<HTMLFormElement>;
 
 export const PromptInput = ({ className, ...props }: PromptInputProps) => (
   <form
     className={cn(
       "w-full overflow-hidden rounded-xl border bg-background shadow-xs",
-      className
+      className,
     )}
     suppressHydrationWarning
     {...props}
   />
 );
 
-export type PromptInputTextareaProps = ComponentProps<typeof Textarea> & {
+type PromptInputTextareaProps = ComponentProps<typeof Textarea> & {
   minHeight?: number;
   maxHeight?: number;
   disableAutoResize?: boolean;
@@ -63,7 +55,7 @@ export const PromptInputTextarea = ({
 
       const form = e.currentTarget.form;
       const submitButton = form?.querySelector(
-        'button[type="submit"]'
+        'button[type="submit"]',
       ) as HTMLButtonElement | null;
       if (submitButton?.disabled) {
         return;
@@ -84,7 +76,7 @@ export const PromptInputTextarea = ({
             : "field-sizing-content max-h-[6lh]",
         "bg-transparent dark:bg-transparent",
         "focus-visible:ring-0",
-        className
+        className,
       )}
       name="message"
       onChange={(e) => {
@@ -97,7 +89,7 @@ export const PromptInputTextarea = ({
   );
 };
 
-export type PromptInputToolbarProps = HTMLAttributes<HTMLDivElement>;
+type PromptInputToolbarProps = HTMLAttributes<HTMLDivElement>;
 
 export const PromptInputToolbar = ({
   className,
@@ -109,50 +101,7 @@ export const PromptInputToolbar = ({
   />
 );
 
-export type PromptInputToolsProps = HTMLAttributes<HTMLDivElement>;
-
-export const PromptInputTools = ({
-  className,
-  ...props
-}: PromptInputToolsProps) => (
-  <div
-    className={cn(
-      "flex items-center gap-1",
-      "[&_button:first-child]:rounded-bl-xl",
-      className
-    )}
-    {...props}
-  />
-);
-
-export type PromptInputButtonProps = ComponentProps<typeof Button>;
-
-export const PromptInputButton = ({
-  variant = "ghost",
-  className,
-  size,
-  ...props
-}: PromptInputButtonProps) => {
-  const newSize =
-    (size ?? Children.count(props.children) > 1) ? "default" : "icon";
-
-  return (
-    <Button
-      className={cn(
-        "shrink-0 gap-1.5 rounded-lg",
-        variant === "ghost" && "text-muted-foreground",
-        newSize === "default" && "px-3",
-        className
-      )}
-      size={newSize}
-      type="button"
-      variant={variant}
-      {...props}
-    />
-  );
-};
-
-export type PromptInputSubmitProps = ComponentProps<typeof Button> & {
+type PromptInputSubmitProps = ComponentProps<typeof Button> & {
   status?: ChatStatus;
 };
 
@@ -186,59 +135,3 @@ export const PromptInputSubmit = ({
     </Button>
   );
 };
-
-export type PromptInputModelSelectProps = ComponentProps<typeof Select>;
-
-export const PromptInputModelSelect = (props: PromptInputModelSelectProps) => (
-  <Select {...props} />
-);
-
-export type PromptInputModelSelectTriggerProps = ComponentProps<
-  typeof SelectTrigger
->;
-
-export const PromptInputModelSelectTrigger = ({
-  className,
-  ...props
-}: PromptInputModelSelectTriggerProps) => (
-  <SelectTrigger
-    className={cn(
-      "border-none bg-transparent font-medium text-muted-foreground shadow-none transition-colors",
-      "hover:bg-accent hover:text-foreground aria-expanded:bg-accent aria-expanded:text-foreground",
-      "h-auto px-2 py-1.5",
-      className
-    )}
-    {...props}
-  />
-);
-
-export type PromptInputModelSelectContentProps = ComponentProps<
-  typeof SelectContent
->;
-
-export const PromptInputModelSelectContent = ({
-  className,
-  ...props
-}: PromptInputModelSelectContentProps) => (
-  <SelectContent className={cn(className)} {...props} />
-);
-
-export type PromptInputModelSelectItemProps = ComponentProps<typeof SelectItem>;
-
-export const PromptInputModelSelectItem = ({
-  className,
-  ...props
-}: PromptInputModelSelectItemProps) => (
-  <SelectItem className={cn(className)} {...props} />
-);
-
-export type PromptInputModelSelectValueProps = ComponentProps<
-  typeof SelectValue
->;
-
-export const PromptInputModelSelectValue = ({
-  className,
-  ...props
-}: PromptInputModelSelectValueProps) => (
-  <SelectValue className={cn(className)} {...props} />
-);
