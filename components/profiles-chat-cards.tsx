@@ -2,7 +2,7 @@
 
 import type { UseChatHelpers } from "@ai-sdk/react";
 import Image from "next/image";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import type { PartnerProfile, ProfileSet } from "@/lib/ai/preference-schema";
 import type { ChatMessage } from "@/lib/types";
@@ -50,44 +50,6 @@ function writeSavedMatchesToLocalStorage(matches: SavedMatchRecord[]) {
   );
 }
 
-const profileTypeConfig = {
-  close_match: {
-    label: "Close Match",
-    emoji: "💚",
-    badgeClass:
-      "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300",
-  },
-  moderate_stretch: {
-    label: "Moderate Stretch",
-    emoji: "💛",
-    badgeClass:
-      "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300",
-  },
-  exploratory: {
-    label: "Exploratory",
-    emoji: "💙",
-    badgeClass:
-      "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300",
-  },
-};
-
-function getProfileTypeConfig(rawType: string | undefined) {
-  const normalized = (rawType ?? "")
-    .toLowerCase()
-    .trim()
-    .replace(/[\s-]+/g, "_");
-
-  if (normalized === "close_match") {
-    return profileTypeConfig.close_match;
-  }
-
-  if (normalized === "moderate_stretch") {
-    return profileTypeConfig.moderate_stretch;
-  }
-
-  return profileTypeConfig.exploratory;
-}
-
 function isAntiMatchType(rawType: string | undefined) {
   const normalized = (rawType ?? "")
     .toLowerCase()
@@ -116,146 +78,144 @@ function ProfileCard({
   onLike: (profile: PartnerProfile) => void;
   onDislike: (profile: PartnerProfile) => void;
 }) {
-  const config = getProfileTypeConfig(profile.type);
+  const initials = profile.name
+    .split(" ")
+    .map((part) => part[0])
+    .join("")
+    .slice(0, 2)
+    .toUpperCase();
 
   return (
-    <div className="mb-6 rounded-2xl border border-zinc-200 bg-white shadow-sm dark:border-zinc-700 dark:bg-zinc-900">
-      <div className="flex items-center justify-between rounded-t-2xl border-b border-zinc-100 bg-zinc-50 px-5 py-3 dark:border-zinc-700 dark:bg-zinc-800/50">
-        <span
-          className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold ${config.badgeClass}`}
-        >
-          {config.emoji} {config.label}
-        </span>
-        <span className="text-sm font-medium text-zinc-500 dark:text-zinc-400">
-          Score:{" "}
-          <span className="font-bold text-zinc-900 dark:text-zinc-100">
-            {profile.compatibilityScore}%
-          </span>
-        </span>
-      </div>
+    <div className="mx-auto mb-6 w-full max-w-4xl overflow-hidden rounded-3xl border border-zinc-200/80 bg-white shadow-[0_8px_30px_rgba(0,0,0,0.08)] dark:border-zinc-700 dark:bg-zinc-900">
+      <div className="grid grid-cols-1 md:grid-cols-[320px_1fr]">
+        <div className="relative h-48 w-full bg-zinc-100 sm:h-56 md:h-full dark:bg-zinc-800">
+          {profile.profilePhotoDataUrl ? (
+            <Image
+              alt={`${profile.name} profile photo`}
+              className="h-full w-full object-cover"
+              fill={true}
+              sizes="(max-width: 768px) 100vw, 320px"
+              src={profile.profilePhotoDataUrl}
+            />
+          ) : (
+            <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-rose-200 to-amber-100 text-5xl font-semibold text-zinc-700 dark:from-zinc-700 dark:to-zinc-800 dark:text-zinc-100">
+              {initials}
+            </div>
+          )}
 
-      <div className="px-5 py-4">
-        <div className="mb-3 flex items-center gap-3">
-          <div className="relative h-14 w-14 overflow-hidden rounded-full border border-zinc-200 bg-zinc-100 dark:border-zinc-700 dark:bg-zinc-800">
-            {profile.profilePhotoDataUrl ? (
-              <Image
-                alt={`${profile.name} profile photo`}
-                className="h-full w-full object-cover"
-                height={56}
-                src={profile.profilePhotoDataUrl}
-                width={56}
-              />
+          <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/70 via-black/30 to-transparent p-4 text-white md:hidden">
+            <h3 className="text-xl font-semibold tracking-tight">
+              {profile.name}, {profile.age}
+            </h3>
+            <p className="mt-1 text-xs text-white/90 sm:text-sm">
+              {profile.location} · {profile.occupation}
+            </p>
+            {profile.height ? (
+              <p className="mt-1 text-xs uppercase tracking-wide text-white/70">
+                {profile.height}
+              </p>
+            ) : null}
+          </div>
+        </div>
+
+        <div className="space-y-3 px-4 py-4 sm:px-5 sm:py-5">
+          <div className="hidden md:block">
+            <h3 className="text-2xl font-semibold tracking-tight text-zinc-900 dark:text-zinc-100">
+              {profile.name}, {profile.age}
+            </h3>
+            <p className="mt-1 text-xs text-zinc-500 sm:text-sm dark:text-zinc-400">
+              {profile.location} · {profile.occupation}
+            </p>
+            {profile.height ? (
+              <p className="mt-1 text-xs uppercase tracking-wide text-zinc-400 dark:text-zinc-500">
+                {profile.height}
+              </p>
+            ) : null}
+          </div>
+
+          {(profile.ethnicity ||
+            profile.religion ||
+            profile.education ||
+            profile.politicalViews) && (
+            <div className="flex flex-wrap gap-1.5 text-xs">
+              {profile.ethnicity && (
+                <span className="rounded-full bg-zinc-100 px-2 py-0.5 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-300">
+                  {profile.ethnicity}
+                </span>
+              )}
+              {profile.religion && (
+                <span className="rounded-full bg-zinc-100 px-2 py-0.5 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-300">
+                  {profile.religion}
+                </span>
+              )}
+              {profile.education && (
+                <span className="rounded-full bg-zinc-100 px-2 py-0.5 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-300">
+                  {profile.education}
+                </span>
+              )}
+              {profile.politicalViews && (
+                <span className="rounded-full bg-zinc-100 px-2 py-0.5 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-300">
+                  {profile.politicalViews}
+                </span>
+              )}
+            </div>
+          )}
+
+          <p className="text-sm leading-relaxed text-zinc-700 dark:text-zinc-300">
+            {profile.bio}
+          </p>
+
+          <div className="flex flex-wrap gap-1.5">
+            {profile.traits.map((trait) => (
+              <span
+                key={trait}
+                className="rounded-full bg-rose-50 px-2.5 py-0.5 text-xs font-medium text-rose-700 dark:bg-zinc-800 dark:text-zinc-300"
+              >
+                {trait}
+              </span>
+            ))}
+          </div>
+
+          <div className="flex flex-wrap justify-end gap-2 border-zinc-100 pt-1 md:border-t dark:border-zinc-800">
+            {onSave ? (
+              <button
+                className="flex items-center gap-1.5 rounded-full border border-zinc-200 bg-white px-4 py-1.5 text-sm font-medium text-zinc-700 transition-colors hover:border-amber-300 hover:bg-amber-50 hover:text-amber-700 disabled:cursor-not-allowed disabled:opacity-60 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:border-amber-700 dark:hover:bg-amber-900/20 dark:hover:text-amber-300"
+                disabled={Boolean(isSaved) || Boolean(isSaving)}
+                onClick={() => onSave(profile)}
+                type="button"
+              >
+                {isSaved ? "⭐ Saved" : isSaving ? "Saving..." : "⭐ Save match"}
+              </button>
+            ) : null}
+
+            {onRemove ? (
+              <button
+                className="flex items-center gap-1.5 rounded-full border border-zinc-200 bg-white px-4 py-1.5 text-sm font-medium text-zinc-700 transition-colors hover:border-zinc-400 hover:bg-zinc-100 disabled:cursor-not-allowed disabled:opacity-60 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:border-zinc-500 dark:hover:bg-zinc-700"
+                disabled={Boolean(isRemoving)}
+                onClick={onRemove}
+                type="button"
+              >
+                {isRemoving ? "Removing..." : "Remove"}
+              </button>
             ) : (
-              <div className="flex h-full w-full items-center justify-center text-sm font-semibold text-zinc-500 dark:text-zinc-400">
-                {profile.name
-                  .split(" ")
-                  .map((part) => part[0])
-                  .join("")
-                  .slice(0, 2)
-                  .toUpperCase()}
-              </div>
+              <>
+                <button
+                  className="flex items-center gap-1.5 rounded-full border border-zinc-200 bg-white px-4 py-1.5 text-sm font-medium text-zinc-700 transition-colors hover:border-red-300 hover:bg-red-50 hover:text-red-600 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:border-red-700 dark:hover:bg-red-900/20 dark:hover:text-red-400"
+                  onClick={() => onDislike(profile)}
+                  type="button"
+                >
+                  👎 Not for me
+                </button>
+                <button
+                  className="flex items-center gap-1.5 rounded-full border border-zinc-200 bg-white px-4 py-1.5 text-sm font-medium text-zinc-700 transition-colors hover:border-green-300 hover:bg-green-50 hover:text-green-600 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:border-green-700 dark:hover:bg-green-900/20 dark:hover:text-green-400"
+                  onClick={() => onLike(profile)}
+                  type="button"
+                >
+                  👍 This is promising
+                </button>
+              </>
             )}
           </div>
-          <div>
-            <h3 className="text-lg font-bold text-zinc-900 dark:text-zinc-100">
-              {profile.name}, {profile.age}
-              {profile.height ? (
-                <span className="ml-2 text-sm font-normal text-zinc-500 dark:text-zinc-400">
-                  · {profile.height}
-                </span>
-              ) : null}
-            </h3>
-            <p className="text-sm text-zinc-500 dark:text-zinc-400">
-              {profile.location} &middot; {profile.occupation}
-            </p>
-          </div>
-        </div>
-
-        {(profile.ethnicity ||
-          profile.religion ||
-          profile.education ||
-          profile.politicalViews) && (
-          <div className="mb-4 flex flex-wrap gap-x-4 gap-y-1 text-xs text-zinc-500 dark:text-zinc-400">
-            {profile.ethnicity && <span>{profile.ethnicity}</span>}
-            {profile.religion && <span>{profile.religion}</span>}
-            {profile.education && <span>{profile.education}</span>}
-            {profile.politicalViews && <span>{profile.politicalViews}</span>}
-          </div>
-        )}
-
-        <blockquote className="mb-4 border-l-2 border-zinc-300 pl-3 text-sm leading-relaxed text-zinc-700 italic dark:border-zinc-600 dark:text-zinc-300">
-          &ldquo;{profile.bio}&rdquo;
-        </blockquote>
-
-        <div className="mb-4 flex flex-wrap gap-2">
-          {profile.traits.map((trait) => (
-            <span
-              key={trait}
-              className="rounded-full bg-zinc-100 px-3 py-1 text-xs text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300"
-            >
-              {trait}
-            </span>
-          ))}
-        </div>
-
-        <div className="mb-4 space-y-2 text-sm">
-          <div>
-            <span className="font-semibold text-zinc-700 dark:text-zinc-300">
-              Why you&apos;d click:{" "}
-            </span>
-            <span className="text-zinc-600 dark:text-zinc-400">
-              {profile.compatibilityNotes}
-            </span>
-          </div>
-          <div>
-            <span className="font-semibold text-zinc-700 dark:text-zinc-300">
-              Growth point:{" "}
-            </span>
-            <span className="text-zinc-500 dark:text-zinc-500">
-              {profile.challengePoint}
-            </span>
-          </div>
-        </div>
-
-        <div className="flex flex-wrap justify-end gap-2">
-          {onSave ? (
-            <button
-              className="flex items-center gap-1.5 rounded-full border border-zinc-200 bg-white px-4 py-1.5 text-sm font-medium text-zinc-700 transition-colors hover:border-amber-300 hover:bg-amber-50 hover:text-amber-700 disabled:cursor-not-allowed disabled:opacity-60 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:border-amber-700 dark:hover:bg-amber-900/20 dark:hover:text-amber-300"
-              disabled={Boolean(isSaved) || Boolean(isSaving)}
-              onClick={() => onSave(profile)}
-              type="button"
-            >
-              {isSaved ? "⭐ Saved" : isSaving ? "Saving..." : "⭐ Save match"}
-            </button>
-          ) : null}
-
-          {onRemove ? (
-            <button
-              className="flex items-center gap-1.5 rounded-full border border-zinc-200 bg-white px-4 py-1.5 text-sm font-medium text-zinc-700 transition-colors hover:border-zinc-400 hover:bg-zinc-100 disabled:cursor-not-allowed disabled:opacity-60 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:border-zinc-500 dark:hover:bg-zinc-700"
-              disabled={Boolean(isRemoving)}
-              onClick={onRemove}
-              type="button"
-            >
-              {isRemoving ? "Removing..." : "Remove"}
-            </button>
-          ) : (
-            <>
-              <button
-                className="flex items-center gap-1.5 rounded-full border border-zinc-200 bg-white px-4 py-1.5 text-sm font-medium text-zinc-700 transition-colors hover:border-red-300 hover:bg-red-50 hover:text-red-600 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:border-red-700 dark:hover:bg-red-900/20 dark:hover:text-red-400"
-                onClick={() => onDislike(profile)}
-                type="button"
-              >
-                👎 Not for me
-              </button>
-              <button
-                className="flex items-center gap-1.5 rounded-full border border-zinc-200 bg-white px-4 py-1.5 text-sm font-medium text-zinc-700 transition-colors hover:border-green-300 hover:bg-green-50 hover:text-green-600 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:border-green-700 dark:hover:bg-green-900/20 dark:hover:text-green-400"
-                onClick={() => onLike(profile)}
-                type="button"
-              >
-                👍 This is promising
-              </button>
-            </>
-          )}
         </div>
       </div>
     </div>
@@ -276,6 +236,12 @@ export function ProfilesChatCards({
   const [isSavedLoading, setIsSavedLoading] = useState(true);
   const [savingProfileId, setSavingProfileId] = useState<string | null>(null);
   const [removingMatchId, setRemovingMatchId] = useState<string | null>(null);
+  const [currentIndex, setCurrentIndex] = useState(0);
+  const [savedIndex, setSavedIndex] = useState(0);
+  const [swipeStartX, setSwipeStartX] = useState<number | null>(null);
+  const [swipeOffsetX, setSwipeOffsetX] = useState(0);
+  const [isSwipeDragging, setIsSwipeDragging] = useState(false);
+  const activePointerIdRef = useRef<number | null>(null);
 
   useEffect(() => {
     let isMounted = true;
@@ -323,6 +289,24 @@ export function ProfilesChatCards({
       savedMatches.map((match) => `${match.documentId}:${match.profileId}`),
     );
   }, [savedMatches]);
+
+  useEffect(() => {
+    if (profileSet.profiles.length === 0) {
+      setCurrentIndex(0);
+      return;
+    }
+
+    setCurrentIndex((index) => Math.min(index, profileSet.profiles.length - 1));
+  }, [profileSet.profiles.length]);
+
+  useEffect(() => {
+    if (savedMatches.length === 0) {
+      setSavedIndex(0);
+      return;
+    }
+
+    setSavedIndex((index) => Math.min(index, savedMatches.length - 1));
+  }, [savedMatches.length]);
 
   const handleSaveMatch = async (profile: PartnerProfile) => {
     if (!documentId) {
@@ -450,6 +434,63 @@ export function ProfilesChatCards({
     });
   };
 
+  const resetSwipe = () => {
+    setSwipeStartX(null);
+    setSwipeOffsetX(0);
+    setIsSwipeDragging(false);
+  };
+
+  const handleSwipeStart = (x: number) => {
+    if (activeTab !== "current") {
+      return;
+    }
+
+    setSwipeStartX(x);
+    setIsSwipeDragging(true);
+  };
+
+  const handleSwipeMove = (x: number) => {
+    if (swipeStartX === null || activeTab !== "current") {
+      return;
+    }
+
+    const delta = x - swipeStartX;
+    const clamped = Math.max(-140, Math.min(140, delta));
+    setSwipeOffsetX(clamped);
+  };
+
+  const handleSwipeEnd = () => {
+    if (activeTab !== "current") {
+      resetSwipe();
+      return;
+    }
+
+    const activeProfile = profileSet.profiles[currentIndex];
+
+    if (!activeProfile) {
+      resetSwipe();
+      return;
+    }
+
+    const threshold = 90;
+
+    if (swipeOffsetX >= threshold) {
+      handleLike(activeProfile);
+    } else if (swipeOffsetX <= -threshold) {
+      handleDislike(activeProfile);
+    }
+
+    resetSwipe();
+  };
+
+  const isInteractiveElement = (target: EventTarget | null) => {
+    if (!(target instanceof Element)) {
+      return false;
+    }
+
+    return Boolean(target.closest("button,a,input,textarea,select"));
+  };
+
   return (
     <div className="w-full rounded-xl border border-border bg-background p-4">
       <div className="mb-5 flex items-center gap-2">
@@ -489,16 +530,44 @@ export function ProfilesChatCards({
               profile to keep it here.
             </div>
           ) : (
-            savedMatches.map((savedMatch) => (
+            <>
+              <div className="mb-3 flex items-center justify-between text-xs text-zinc-500 dark:text-zinc-400">
+                <span>
+                  Saved profile {savedIndex + 1} of {savedMatches.length}
+                </span>
+                <div className="flex items-center gap-2">
+                  <button
+                    className="rounded-full border border-zinc-200 px-2.5 py-1 hover:bg-zinc-100 disabled:opacity-50 dark:border-zinc-700 dark:hover:bg-zinc-800"
+                    disabled={savedIndex === 0}
+                    onClick={() => setSavedIndex((index) => Math.max(0, index - 1))}
+                    type="button"
+                  >
+                    Prev
+                  </button>
+                  <button
+                    className="rounded-full border border-zinc-200 px-2.5 py-1 hover:bg-zinc-100 disabled:opacity-50 dark:border-zinc-700 dark:hover:bg-zinc-800"
+                    disabled={savedIndex >= savedMatches.length - 1}
+                    onClick={() =>
+                      setSavedIndex((index) =>
+                        Math.min(savedMatches.length - 1, index + 1),
+                      )
+                    }
+                    type="button"
+                  >
+                    Next
+                  </button>
+                </div>
+              </div>
+
               <ProfileCard
-                key={savedMatch.id}
-                isRemoving={removingMatchId === savedMatch.id}
+                key={savedMatches[savedIndex].id}
+                isRemoving={removingMatchId === savedMatches[savedIndex].id}
                 onDislike={() => {}}
                 onLike={() => {}}
-                onRemove={() => handleRemoveSavedMatch(savedMatch.id)}
-                profile={savedMatch.profile}
+                onRemove={() => handleRemoveSavedMatch(savedMatches[savedIndex].id)}
+                profile={savedMatches[savedIndex].profile}
               />
-            ))
+            </>
           )}
         </div>
       ) : null}
@@ -510,22 +579,115 @@ export function ProfilesChatCards({
               {profileSet.preferencesSummary}
             </p>
           )}
-          {profileSet.profiles.map((profile) => (
-            <ProfileCard
-              isSaved={
-                !isAntiMatchType(profile.type) &&
-                savedProfileKeys.has(`${documentId}:${profile.id}`)
-              }
-              isSaving={savingProfileId === profile.id}
-              key={profile.id}
-              onDislike={handleDislike}
-              onLike={handleLike}
-              onSave={
-                isAntiMatchType(profile.type) ? undefined : handleSaveMatch
-              }
-              profile={profile}
-            />
-          ))}
+          {profileSet.profiles.length > 0 && (
+            <>
+              <div className="mb-3 flex items-center justify-between text-xs text-zinc-500 dark:text-zinc-400">
+                <span>
+                  Match {currentIndex + 1} of {profileSet.profiles.length}
+                </span>
+                <div className="flex items-center gap-2">
+                  <button
+                    className="rounded-full border border-zinc-200 px-2.5 py-1 hover:bg-zinc-100 disabled:opacity-50 dark:border-zinc-700 dark:hover:bg-zinc-800"
+                    disabled={currentIndex === 0}
+                    onClick={() => setCurrentIndex((index) => Math.max(0, index - 1))}
+                    type="button"
+                  >
+                    Prev
+                  </button>
+                  <button
+                    className="rounded-full border border-zinc-200 px-2.5 py-1 hover:bg-zinc-100 disabled:opacity-50 dark:border-zinc-700 dark:hover:bg-zinc-800"
+                    disabled={currentIndex >= profileSet.profiles.length - 1}
+                    onClick={() =>
+                      setCurrentIndex((index) =>
+                        Math.min(profileSet.profiles.length - 1, index + 1),
+                      )
+                    }
+                    type="button"
+                  >
+                    Next
+                  </button>
+                </div>
+              </div>
+
+              <div
+                className="relative"
+                onPointerCancel={handleSwipeEnd}
+                onPointerDown={(event) => {
+                  if (isInteractiveElement(event.target)) {
+                    return;
+                  }
+
+                  activePointerIdRef.current = event.pointerId;
+                  event.currentTarget.setPointerCapture(event.pointerId);
+                  handleSwipeStart(event.clientX);
+                }}
+                onPointerMove={(event) => {
+                  if (activePointerIdRef.current !== event.pointerId) {
+                    return;
+                  }
+
+                  handleSwipeMove(event.clientX);
+                }}
+                onPointerUp={(event) => {
+                  if (activePointerIdRef.current !== event.pointerId) {
+                    return;
+                  }
+
+                  activePointerIdRef.current = null;
+                  if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+                    event.currentTarget.releasePointerCapture(event.pointerId);
+                  }
+                  handleSwipeEnd();
+                }}
+                style={{ touchAction: "pan-y" }}
+              >
+                <div
+                  className={isSwipeDragging ? "transition-none" : "transition-transform duration-200"}
+                  style={{
+                    transform: `translateX(${swipeOffsetX}px) rotate(${swipeOffsetX / 25}deg)`,
+                  }}
+                >
+                  <ProfileCard
+                    isSaved={
+                      !isAntiMatchType(profileSet.profiles[currentIndex].type) &&
+                      savedProfileKeys.has(
+                        `${documentId}:${profileSet.profiles[currentIndex].id}`,
+                      )
+                    }
+                    isSaving={
+                      savingProfileId === profileSet.profiles[currentIndex].id
+                    }
+                    key={profileSet.profiles[currentIndex].id}
+                    onDislike={handleDislike}
+                    onLike={handleLike}
+                    onSave={
+                      isAntiMatchType(profileSet.profiles[currentIndex].type)
+                        ? undefined
+                        : handleSaveMatch
+                    }
+                    profile={profileSet.profiles[currentIndex]}
+                  />
+                </div>
+
+                <div
+                  className="pointer-events-none absolute top-3 left-3 rounded-full bg-red-600/90 px-2.5 py-1 text-xs font-semibold text-white"
+                  style={{ opacity: Math.max(0, -swipeOffsetX / 70) }}
+                >
+                  👎 Pass
+                </div>
+                <div
+                  className="pointer-events-none absolute top-3 right-3 rounded-full bg-green-600/90 px-2.5 py-1 text-xs font-semibold text-white"
+                  style={{ opacity: Math.max(0, swipeOffsetX / 70) }}
+                >
+                  👍 Like
+                </div>
+              </div>
+
+              <p className="-mt-2 mb-2 text-center text-xs text-zinc-500 dark:text-zinc-400">
+                Swipe left to pass, swipe right to like.
+              </p>
+            </>
+          )}
         </>
       ) : null}
     </div>

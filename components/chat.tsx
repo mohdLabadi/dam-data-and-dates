@@ -21,6 +21,92 @@ import { MultimodalInput } from "./multimodal-input";
 import { toast } from "./toast";
 import type { VisibilityType } from "./visibility-selector";
 
+const MAX_CHAT_REQUEST_CHARS = 7_500_000;
+const MIN_MESSAGES_TO_KEEP = 8;
+
+function estimatePayloadChars(messages: ChatMessage[]) {
+  try {
+    return JSON.stringify(messages).length;
+  } catch {
+    return Number.MAX_SAFE_INTEGER;
+  }
+}
+
+function stripProfilePhotoDataFromMessages(messages: ChatMessage[]) {
+  return messages.map((message) => ({
+    ...message,
+    parts: message.parts.map((part) => {
+      if (part.type !== "tool-generateProfiles") {
+        return part;
+      }
+
+      const rawOutput = (part as { output?: unknown }).output;
+
+      if (!rawOutput || typeof rawOutput !== "object") {
+        return part;
+      }
+
+      const output = rawOutput as {
+        profileSet?: {
+          profiles?: Array<Record<string, unknown>>;
+          preferencesSummary?: string;
+          generatedAt?: string;
+        };
+        profiles?: Array<Record<string, unknown>>;
+      };
+
+      const stripPhoto = (profile: Record<string, unknown>) => {
+        const { profilePhotoDataUrl: _profilePhotoDataUrl, ...rest } = profile;
+        return rest;
+      };
+
+      const nextProfileSet = output.profileSet
+        ? {
+            ...output.profileSet,
+            profiles: Array.isArray(output.profileSet.profiles)
+              ? output.profileSet.profiles.map(stripPhoto)
+              : output.profileSet.profiles,
+          }
+        : undefined;
+
+      const nextProfiles = Array.isArray(output.profiles)
+        ? output.profiles.map(stripPhoto)
+        : output.profiles;
+
+      const sanitizedPart = {
+        ...part,
+        output: {
+          ...output,
+          ...(nextProfileSet ? { profileSet: nextProfileSet } : {}),
+          ...(nextProfiles ? { profiles: nextProfiles } : {}),
+        },
+      };
+
+      return sanitizedPart as unknown as ChatMessage["parts"][number];
+    }),
+  })) as ChatMessage[];
+}
+
+function sanitizeMessagesForRequest(messages: ChatMessage[]) {
+  const stripped = stripProfilePhotoDataFromMessages(messages);
+
+  if (estimatePayloadChars(stripped) <= MAX_CHAT_REQUEST_CHARS) {
+    return stripped;
+  }
+
+  const trimmed = [...stripped];
+
+  // Drop oldest history first while keeping recent context intact.
+  while (
+    trimmed.length > MIN_MESSAGES_TO_KEEP &&
+    estimatePayloadChars(trimmed) > MAX_CHAT_REQUEST_CHARS
+  ) {
+    trimmed.shift();
+  }
+
+  return trimmed;
+}
+
 export function Chat({
   id,
   initialMessages,
@@ -91,12 +177,14 @@ export function Chat({
       api: "/api/chat",
       fetch: fetchWithErrorHandlers,
       prepareSendMessagesRequest(request) {
-        const lastMessage = request.messages.at(-1);
+        const sanitizedMessages = sanitizeMessagesForRequest(request.messages);
+        const lastMessage = sanitizedMessages.at(-1);
+
         return {
           body: {
             id: request.id,
             message: lastMessage,
-            messages: request.messages,
+            messages: sanitizedMessages,
             selectedChatModel: initialChatModel,
             selectedVisibilityType: visibilityType,
             forceGenerateProfiles: (() => {
