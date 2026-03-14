@@ -243,7 +243,8 @@ export function ProfilesChatCards({
   const [swipeDecisions, setSwipeDecisions] = useState<
     Record<string, SwipeDecision>
   >({});
-  const [hasSubmittedSwipeSummary, setHasSubmittedSwipeSummary] = useState(false);
+  const [hasSubmittedSwipeSummary, setHasSubmittedSwipeSummary] =
+    useState(false);
   const activePointerIdRef = useRef<number | null>(null);
 
   const profileIdsSignature = useMemo(
@@ -530,7 +531,8 @@ export function ProfilesChatCards({
     0,
   );
   const isSwipePhaseComplete =
-    profileSet.profiles.length > 0 && swipedCount === profileSet.profiles.length;
+    profileSet.profiles.length > 0 &&
+    swipedCount === profileSet.profiles.length;
   const activeProfileDecision = profileSet.profiles[currentIndex]
     ? swipeDecisions[profileSet.profiles[currentIndex].id]
     : undefined;
@@ -719,11 +721,9 @@ export function ProfilesChatCards({
                   }}
                 >
                   <ProfileCard
-                    isSaved={
-                      savedProfileKeys.has(
-                        `${documentId}:${profileSet.profiles[currentIndex].id}`,
-                      )
-                    }
+                    isSaved={savedProfileKeys.has(
+                      `${documentId}:${profileSet.profiles[currentIndex].id}`,
+                    )}
                     isSaving={
                       savingProfileId === profileSet.profiles[currentIndex].id
                     }
