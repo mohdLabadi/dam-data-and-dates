@@ -357,6 +357,7 @@ export async function POST(request: Request) {
       forceGenerateProfiles && !isReasoningModel
         ? ({ type: "tool", toolName: "generateProfiles" } as const)
         : undefined;
+    const maxStepCount = forceGenerateProfiles ? 1 : 5;
 
     const stream = createUIMessageStream({
       originalMessages: isToolApprovalFlow ? uiMessages : undefined,
@@ -366,7 +367,7 @@ export async function POST(request: Request) {
           maxRetries: 0,
           system: `${systemPrompt({ selectedChatModel: resolvedChatModel, requestHints })}${runtimeGuidance}`,
           messages: modelMessages,
-          stopWhen: stepCountIs(5),
+          stopWhen: stepCountIs(maxStepCount),
           toolChoice: forcedToolChoice,
           experimental_activeTools: activeTools,
           providerOptions: isReasoningModel

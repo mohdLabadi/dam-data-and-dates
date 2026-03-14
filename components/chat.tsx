@@ -153,11 +153,7 @@ export function Chat({
     if (initialProfileDocumentId) {
       setArtifact((current) => ({
         ...current,
-        documentId: initialProfileDocumentId,
-        kind: "profiles",
-        title: "Your Matches",
-        status: "idle",
-        isVisible: true,
+        isVisible: current.kind === "profiles" ? false : current.isVisible,
       }));
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
