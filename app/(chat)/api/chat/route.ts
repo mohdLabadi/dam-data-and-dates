@@ -381,7 +381,7 @@ export async function POST(request: Request) {
             createDocument: createDocument({ session, dataStream }),
             updateDocument: updateDocument({ session, dataStream }),
             requestSuggestions: requestSuggestions({ session, dataStream }),
-            generateProfiles: generateProfiles({ session, dataStream, chatId: id }),
+            generateProfiles: generateProfiles({ session, chatId: id }),
           },
           experimental_telemetry: {
             isEnabled: isProductionEnvironment,

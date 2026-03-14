@@ -1,4 +1,4 @@
-import { generateText, tool, type UIMessageStreamWriter } from "ai";
+import { generateText, tool } from "ai";
 import type { Session } from "next-auth";
 import { z } from "zod";
 import {
@@ -13,12 +13,10 @@ import type {
 } from "@/lib/ai/preference-schema";
 import { getArtifactModel } from "@/lib/ai/providers";
 import { saveDocument } from "@/lib/db/queries";
-import type { ChatMessage } from "@/lib/types";
 import { generateUUID } from "@/lib/utils";
 
 type GenerateProfilesProps = {
   session: Session;
-  dataStream: UIMessageStreamWriter<ChatMessage>;
   chatId: string;
 };
 
@@ -172,7 +170,6 @@ function parseProfileSetFromJson(input: string): ProfileSet | null {
 
 export const generateProfiles = ({
   session,
-  dataStream,
   chatId,
 }: GenerateProfilesProps) =>
   tool({
@@ -271,16 +268,6 @@ export const generateProfiles = ({
       const id = generateUUID();
       let profileSet: ProfileSet | null = null;
 
-      // Signal artifact panel to open with profiles kind
-      dataStream.write({ type: "data-kind", data: "profiles", transient: true });
-      dataStream.write({ type: "data-id", data: id, transient: true });
-      dataStream.write({
-        type: "data-title",
-        data: "Your Matches",
-        transient: true,
-      });
-      dataStream.write({ type: "data-clear", data: null, transient: true });
-
       const prompt = buildProfileGenerationPrompt(preferences);
 
       let profilesJson = "";
@@ -341,28 +328,14 @@ export const generateProfiles = ({
           profileSet = parseProfileSetFromJson(cleaned);
         }
 
-        // Stream the generated JSON to the artifact
-        dataStream.write({
-          type: "data-textDelta",
-          data: profilesJson,
-          transient: true,
-        });
       } catch (err) {
         console.error("Profile generation failed:", err);
-        // Write an error placeholder so the artifact doesn't hang
-        dataStream.write({
-          type: "data-textDelta",
-          data: JSON.stringify({
-            error: "Profile generation failed. Please try again.",
-            profiles: [],
-            preferencesSummary: "",
-            generatedAt: new Date().toISOString(),
-          }),
-          transient: true,
+        profilesJson = JSON.stringify({
+          error: "Profile generation failed. Please try again.",
+          profiles: [],
+          preferencesSummary: "",
+          generatedAt: new Date().toISOString(),
         });
-      } finally {
-        // Always close the artifact stream to prevent the UI from getting stuck
-        dataStream.write({ type: "data-finish", data: null, transient: true });
       }
 
       // Persist document to DB if user is authenticated and we have content
@@ -383,7 +356,7 @@ export const generateProfiles = ({
         profiles: profileSet?.profiles,
         preferencesSummary: profileSet?.preferencesSummary,
         message:
-          "I've generated 4 partner profiles based on your preferences, including one intentional anti-match for comparison. You can see them in the panel on the right. Click 👍 or 👎 on any profile to refine your matches, or tell me what you'd like to adjust.",
+          "I've generated 4 partner profiles based on your preferences, including one intentional anti-match for comparison. They're displayed right here in chat. Click 👍 or 👎 on any profile to refine your matches, or tell me what you'd like to adjust.",
       };
     },
   });

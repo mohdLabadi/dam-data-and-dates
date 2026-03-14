@@ -20,68 +20,12 @@ import {
 import { SparklesIcon } from "./icons";
 import { MessageEditor } from "./message-editor";
 import { MessageReasoning } from "./message-reasoning";
+import { ProfilesChatCards } from "./profiles-chat-cards";
 import { PreviewAttachment } from "./preview-attachment";
 import { Weather } from "./weather";
 
 const EMPTY_ASSISTANT_FALLBACK_TEXT =
   "I couldn't generate a response for that request. Please try again.";
-
-function InlineMatchCard({
-  profile,
-  onLike,
-  onDislike,
-}: {
-  profile: PartnerProfile;
-  onLike: (profile: PartnerProfile) => void;
-  onDislike: (profile: PartnerProfile) => void;
-}) {
-  const traits = Array.isArray(profile.traits) ? profile.traits : [];
-
-  return (
-    <div className="mb-4 rounded-xl border border-border bg-card p-4">
-      <div className="mb-2 flex items-center justify-between">
-        <h3 className="font-semibold text-base">
-          {profile.name}, {profile.age}
-        </h3>
-        <span className="text-muted-foreground text-sm">
-          {profile.compatibilityScore}%
-        </span>
-      </div>
-      <p className="mb-2 text-muted-foreground text-sm">
-        {profile.location} · {profile.occupation}
-      </p>
-      <p className="mb-3 text-sm">{profile.bio}</p>
-      {traits.length > 0 && (
-        <div className="mb-3 flex flex-wrap gap-2">
-          {traits.slice(0, 5).map((trait) => (
-            <span
-              className="rounded-full bg-muted px-2 py-0.5 text-xs"
-              key={trait}
-            >
-              {trait}
-            </span>
-          ))}
-        </div>
-      )}
-      <div className="flex justify-end gap-2">
-        <button
-          className="rounded-md border px-3 py-1.5 text-sm hover:bg-muted"
-          onClick={() => onDislike(profile)}
-          type="button"
-        >
-          👎 Not for me
-        </button>
-        <button
-          className="rounded-md border px-3 py-1.5 text-sm hover:bg-muted"
-          onClick={() => onLike(profile)}
-          type="button"
-        >
-          👍 This is promising
-        </button>
-      </div>
-    </div>
-  );
-}
 
 const PurePreviewMessage = ({
   addToolApprovalResponse,
@@ -372,6 +316,7 @@ const PurePreviewMessage = ({
 
               const rawOutput = (part as { output?: unknown }).output as
                 | {
+                    documentId?: string;
                     profileSet?: {
                       profiles?: PartnerProfile[];
                       preferencesSummary?: string;
@@ -410,39 +355,15 @@ const PurePreviewMessage = ({
 
               return (
                 <div className="w-full" key={toolCallId}>
-                  {profileSet.preferencesSummary && (
-                    <p className="mb-4 text-sm text-muted-foreground">
-                      {profileSet.preferencesSummary}
-                    </p>
-                  )}
-                  {profileSet.profiles.map((profile) => (
-                    <InlineMatchCard
-                      key={profile.id}
-                      profile={profile}
-                      onLike={(p) =>
-                        sendMessage?.({
-                          role: "user",
-                          parts: [
-                            {
-                              type: "text",
-                              text: `I liked ${p.name}'s profile (${p.type.replace("_", " ")}). Their traits that stood out: ${p.traits.slice(0, 3).join(", ")}. Please regenerate all four profiles with more matches like this one.`,
-                            },
-                          ],
-                        })
-                      }
-                      onDislike={(p) =>
-                        sendMessage?.({
-                          role: "user",
-                          parts: [
-                            {
-                              type: "text",
-                              text: `I didn't connect with ${p.name}'s profile. Please regenerate all four profiles and avoid the qualities that made this one feel off.`,
-                            },
-                          ],
-                        })
-                      }
-                    />
-                  ))}
+                  <ProfilesChatCards
+                    documentId={rawOutput?.documentId}
+                    profileSet={{
+                      generatedAt: new Date().toISOString(),
+                      preferencesSummary: profileSet.preferencesSummary ?? "",
+                      profiles: profileSet.profiles,
+                    }}
+                    sendMessage={sendMessage}
+                  />
                 </div>
               );
             }
