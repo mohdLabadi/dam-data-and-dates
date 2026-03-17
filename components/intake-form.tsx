@@ -227,6 +227,92 @@ function TagInput({
   );
 }
 
+function WelcomeScreen({ onAcknowledge }: { onAcknowledge: () => void }) {
+  return (
+    <div className="mx-auto w-full max-w-2xl px-3 pb-6 pt-4 md:px-4">
+      <Card className="overflow-hidden border-border/80">
+        <CardHeader className="bg-muted/40 pb-4">
+          <CardTitle className="text-xl md:text-2xl">
+            Welcome to DAM — your AI matchmaker
+          </CardTitle>
+          <CardDescription>
+            Before we get started, here&apos;s exactly how this works.
+          </CardDescription>
+        </CardHeader>
+
+        <CardContent className="p-4 md:p-6">
+          <div className="flex flex-col gap-5 text-sm text-muted-foreground">
+            <div className="flex flex-col gap-1.5">
+              <p className="font-semibold text-foreground">What DAM does</p>
+              <p>
+                DAM is an AI-powered matchmaking assistant. You share your
+                preferences once, and it generates three realistic dating
+                profiles tailored to what you&apos;re looking for — a close
+                match, a moderate stretch, and an exploratory pick.
+              </p>
+            </div>
+
+            <div className="flex flex-col gap-1.5">
+              <p className="font-semibold text-foreground">
+                What information we use
+              </p>
+              <ul className="ml-4 list-disc space-y-1">
+                <li>Basic details you enter: age, location, and goals</li>
+                <li>
+                  Your preferences: interests, personality traits, values, and
+                  dealbreakers
+                </li>
+                <li>
+                  Your swipe feedback: which profiles you liked or passed on
+                </li>
+              </ul>
+            </div>
+
+            <div className="flex flex-col gap-1.5">
+              <p className="font-semibold text-foreground">
+                How recommendations are made
+              </p>
+              <p>
+                Your answers are sent to an AI language model (Google Gemini)
+                which interprets your preferences and generates fictional but
+                plausible profiles. No real person&apos;s data is used.
+                Profiles are generated fresh each session.
+              </p>
+            </div>
+
+            <div className="flex flex-col gap-1.5">
+              <p className="font-semibold text-foreground">
+                How your feedback helps
+              </p>
+              <p>
+                After you swipe through your matches, DAM asks why you liked or
+                passed on each profile. Your answers refine the next round of
+                suggestions within the same conversation.
+              </p>
+            </div>
+
+            <div className="rounded-lg border border-border bg-muted/30 p-3 text-xs">
+              <span className="font-medium text-foreground">
+                Privacy note:{" "}
+              </span>
+              This app runs without a database. Your preferences and saved
+              matches are stored only in your browser&apos;s local storage and
+              are never sent to a server beyond what&apos;s needed to generate
+              your profiles.
+            </div>
+          </div>
+
+          <div className="mt-6 flex justify-end">
+            <Button onClick={onAcknowledge} type="button" className="px-6">
+              I understand — let&apos;s begin
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
 export function IntakeForm({
   onSubmit,
   isSubmitting,
@@ -234,6 +320,7 @@ export function IntakeForm({
   onSubmit: (prompt: string) => void;
   isSubmitting: boolean;
 }) {
+  const [step, setStep] = useState<"welcome" | "form">("welcome");
   const [values, setValues] = useState<IntakeValues>(initialValues);
   const [isMounted, setIsMounted] = useState(false);
 
@@ -262,6 +349,10 @@ export function IntakeForm({
       values.partnerQualities.length > 0,
     );
   }, [values]);
+
+  if (isMounted && step === "welcome") {
+    return <WelcomeScreen onAcknowledge={() => setStep("form")} />;
+  }
 
   if (!isMounted) {
     return (
