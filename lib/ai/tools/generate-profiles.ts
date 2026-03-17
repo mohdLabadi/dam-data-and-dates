@@ -340,14 +340,18 @@ export const generateProfiles = ({
 
       // Persist document to DB if user is authenticated and we have content
       if (session?.user?.id && profilesJson) {
-        await saveDocument({
-          id,
-          title: "Your Matches",
-          content: profilesJson,
-          kind: "profiles",
-          userId: session.user.id,
-          chatId,
-        });
+        try {
+          await saveDocument({
+            id,
+            title: "Your Matches",
+            content: profilesJson,
+            kind: "profiles",
+            userId: session.user.id,
+            chatId,
+          });
+        } catch (dbErr) {
+          console.error("Failed to persist profiles to DB:", dbErr);
+        }
       }
 
       return {
