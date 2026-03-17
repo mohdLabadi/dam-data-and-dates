@@ -46,10 +46,20 @@ function writeSavedMatchesToLocalStorage(matches: SavedMatchRecord[]) {
     return;
   }
 
-  window.localStorage.setItem(
-    SAVED_MATCHES_STORAGE_KEY,
-    JSON.stringify(matches),
-  );
+  try {
+    window.localStorage.setItem(SAVED_MATCHES_STORAGE_KEY, JSON.stringify(matches));
+  } catch {
+    // Quota exceeded — retry without photo data
+    try {
+      const stripped = matches.map((m) => ({
+        ...m,
+        profile: { ...m.profile, profilePhotoDataUrl: undefined },
+      }));
+      window.localStorage.setItem(SAVED_MATCHES_STORAGE_KEY, JSON.stringify(stripped));
+    } catch {
+      // Still too large — skip local persistence; server is the source of truth
+    }
+  }
 }
 
 export function ProfileCard({
@@ -373,19 +383,39 @@ export function ProfilesChatCards({
       return;
     }
 
-    const liked = profileSet.profiles
-      .filter((profile) => decisions[profile.id] === "like")
-      .map((profile) => profile.name);
-    const passed = profileSet.profiles
-      .filter((profile) => decisions[profile.id] === "pass")
-      .map((profile) => profile.name);
+    const likedProfiles = profileSet.profiles.filter(
+      (profile) => decisions[profile.id] === "like",
+    );
+    const passedProfiles = profileSet.profiles.filter(
+      (profile) => decisions[profile.id] === "pass",
+    );
+
+    const likedSummary =
+      likedProfiles.length > 0
+        ? likedProfiles
+            .map(
+              (p) =>
+                `${p.name} (${p.type.replace("_", " ")}, traits: ${p.traits.slice(0, 4).join(", ")})`,
+            )
+            .join("; ")
+        : "none";
+
+    const passedSummary =
+      passedProfiles.length > 0
+        ? passedProfiles
+            .map(
+              (p) =>
+                `${p.name} (${p.type.replace("_", " ")}, traits: ${p.traits.slice(0, 4).join(", ")})`,
+            )
+            .join("; ")
+        : "none";
 
     sendMessage({
       role: "user",
       parts: [
         {
           type: "text",
-          text: `I finished swiping through all generated matches. I liked: ${liked.length > 0 ? liked.join(", ") : "none"}. I passed on: ${passed.length > 0 ? passed.join(", ") : "none"}. Before suggesting new matches, ask me why I made these choices.`,
+          text: `I finished swiping through all my matches. I liked: ${likedSummary}. I passed on: ${passedSummary}. Based on these swipe decisions, ask me 2-3 targeted follow-up questions to understand what mattered most to me — look for patterns in the traits I liked vs. passed on and ask about those specifically.`,
         },
       ],
     });
@@ -398,6 +428,10 @@ export function ProfilesChatCards({
 
     if (!activeProfile) {
       return;
+    }
+
+    if (decision === "like") {
+      handleSaveMatch(activeProfile);
     }
 
     const nextDecisions: Record<string, SwipeDecision> = {
@@ -582,8 +616,7 @@ export function ProfilesChatCards({
                   savingProfileId === profileSet.profiles[currentIndex].id
                 }
                 key={profileSet.profiles[currentIndex].id}
-                saveLocked={!isSwipePhaseComplete}
-                onSave={handleSaveMatch}
+                onSave={isSwipePhaseComplete ? handleSaveMatch : undefined}
                 profile={profileSet.profiles[currentIndex]}
               />
             </div>
@@ -605,8 +638,14 @@ export function ProfilesChatCards({
           <p className="-mt-2 mb-2 text-center text-xs text-zinc-500 dark:text-zinc-400">
             {isSwipePhaseComplete
               ? "Swiping complete. Use Prev/Next to review all matches."
-              : `Swipe left to pass, swipe right to like. (${swipedCount}/${profileSet.profiles.length} done${activeProfileDecision ? `, current: ${activeProfileDecision}` : ""})`}
+              : `Swipe left to pass, swipe right to like & save. (${swipedCount}/${profileSet.profiles.length} done${activeProfileDecision ? `, current: ${activeProfileDecision}` : ""})`}
           </p>
+
+          {isSwipePhaseComplete && (
+            <p className="mt-1 text-center text-xs text-zinc-400 dark:text-zinc-500">
+              💬 Head to the chat to share what you liked or didn&apos;t like — DAM will refine your next set of matches based on your feedback.
+            </p>
+          )}
         </>
       )}
     </div>

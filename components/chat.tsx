@@ -265,23 +265,9 @@ export function Chat({
       role: "user",
       parts: [{ type: "text", text: `${INTAKE_MESSAGE_PREFIX}${prompt}` }],
     });
-
-    // Keep intake payload out of visible chat history while still allowing backend generation.
-    setTimeout(() => {
-      setMessages((current) =>
-        current.filter(
-          (message) =>
-            !(
-              message.role === "user" &&
-              message.parts.some(
-                (part) =>
-                  part.type === "text" &&
-                  part.text.startsWith(INTAKE_MESSAGE_PREFIX),
-              )
-            ),
-        ),
-      );
-    }, 0);
+    // The intake message is already hidden from the UI by isHiddenIntakeMessage
+    // in messages.tsx — no need to remove it from state. Keeping it ensures the
+    // model retains the original preferences as context for future requests.
   };
 
   return (

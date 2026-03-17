@@ -122,15 +122,14 @@ type ActiveToolName =
   | "requestSuggestions"
   | "generateProfiles";
 
-const SAFE_PART_TYPES = new Set(["text", "reasoning"]);
-
 function stripNonTextParts(messages: ChatMessage[]): ChatMessage[] {
   return messages
     .map((msg) => ({
       ...msg,
-      parts: msg.parts.filter((part) =>
-        SAFE_PART_TYPES.has((part as { type: string }).type)
-      ) as ChatMessage["parts"],
+      parts: msg.parts.filter((part) => {
+        const type = (part as { type: string }).type;
+        return type === "text" || type === "reasoning";
+      }) as ChatMessage["parts"],
     }))
     .filter((msg) => msg.parts.length > 0);
 }
@@ -191,8 +190,8 @@ function buildMatchmakingRuntimeGuidance({
   canUseTools: boolean;
   forceGenerateProfiles?: boolean;
 }) {
-  if (forceGenerateProfiles && canUseTools) {
-    return `\n\nRuntime conversation guidance:\n- The user just completed an intake form and is ready for immediate results.\n- Start with one short line of acknowledgment in a warm tone, e.g. \"Thanks for sharing - I generated profiles based on your preferences.\"\n- Then call generateProfiles now without asking additional intake questions.`;
+  if (forceGenerateProfiles) {
+    return `\n\nRuntime conversation guidance:\n- The user just submitted their intake form. You now have their full preferences.\n- Do NOT call generateProfiles yet.\n- Follow the Profile Generation Flow: send a single confirmation message with your summary and criteria list (Step 1), then wait for the user's go-ahead before generating.`;
   }
 
   const userTexts = getUserTextFromMessages(uiMessages);
@@ -215,6 +214,18 @@ function buildMatchmakingRuntimeGuidance({
       conversation
     );
 
+  // If profiles have already been generated, don't nudge the model to call
+  // generateProfiles again — let the system prompt's post-swipe flow handle it.
+  const profilesAlreadyGenerated = uiMessages.some(
+    (m) =>
+      m.role === "assistant" &&
+      m.parts.some((p) => (p as { type: string }).type === "tool-generateProfiles")
+  );
+
+  if (profilesAlreadyGenerated) {
+    return "";
+  }
+
   const hasEnoughContext =
     hasRelationshipGoal &&
     (asksForMatches || hasTraitsOrValues || userTexts.length >= 4);
@@ -227,7 +238,7 @@ function buildMatchmakingRuntimeGuidance({
     return "";
   }
 
-  return `\n\nRuntime conversation guidance:\n- The user has already shared relationship intent and meaningful preferences.\n- Do NOT ask again what kind of connection they are looking for.\n- Use best-effort inference for missing fields and call generateProfiles now.`;
+  return `\n\nRuntime conversation guidance:\n- The user has already shared relationship intent and meaningful preferences.\n- Do NOT ask again what kind of connection they are looking for.\n- Follow the Profile Generation Flow: present your summary + criteria confirmation (Step 1), then generate profiles only after the user gives the go-ahead (Step 2).`;
 }
 
 export async function POST(request: Request) {
@@ -309,12 +320,17 @@ export async function POST(request: Request) {
           : null;
     }
 
-    const uiMessages =
-      !hasDatabase && incomingMessages?.length
-        ? stripNonTextParts(incomingMessages)
-        : isToolApprovalFlow
-          ? (incomingMessages ?? [])
-          : [...convertToUIMessages(messagesFromDb), normalizedMessage as ChatMessage];
+    // When DB is unavailable or the chat has no saved history, fall back to
+    // the full message history the client sent (incomingMessages).  This keeps
+    // context alive even when POSTGRES_URL is set but the DB is unreachable.
+    const dbHasHistory = hasDatabase && chat && messagesFromDb.length > 0;
+    const uiMessages = isToolApprovalFlow
+      ? (incomingMessages ?? [])
+      : dbHasHistory
+        ? [...convertToUIMessages(messagesFromDb), normalizedMessage as ChatMessage]
+        : incomingMessages?.length
+          ? stripNonTextParts(incomingMessages)
+          : [normalizedMessage as ChatMessage];
 
     const { longitude, latitude, city, country } = geolocation(request);
 
@@ -347,6 +363,19 @@ export async function POST(request: Request) {
       resolvedChatModel.includes("thinking");
 
     const modelMessages = await convertToModelMessages(uiMessages);
+
+    // Only unlock generateProfiles when the user has explicitly confirmed.
+    // This prevents the model from generating profiles mid-conversation or on
+    // ambiguous input like "ijh" — a system-prompt instruction alone is not
+    // reliable enough.
+    const latestUserText = normalizedMessage?.parts
+      .filter((p): p is Extract<typeof p, { type: "text" }> => p.type === "text")
+      .map((p) => p.text)
+      .join(" ")
+      .toLowerCase() ?? "";
+    const isExplicitConfirmation = /\b(yes|yeah|yep|yup|ok|okay|sure|go ahead|generate|looks good|that'?s? right|correct|confirmed?|do it|let'?s? go|proceed|sounds good|perfect|great)\b/.test(latestUserText);
+    const canGenerateProfiles = (modelMessages.length >= 3 || forceGenerateProfiles) && isExplicitConfirmation;
+
     const activeTools: ActiveToolName[] = isReasoningModel
       ? []
       : [
@@ -354,11 +383,7 @@ export async function POST(request: Request) {
           "createDocument",
           "updateDocument",
           "requestSuggestions",
-          ...(
-            modelMessages.length >= 3 || forceGenerateProfiles
-              ? (["generateProfiles"] as const)
-              : []
-          ),
+          ...(canGenerateProfiles ? (["generateProfiles"] as const) : []),
         ];
 
     const runtimeGuidance = buildMatchmakingRuntimeGuidance({
@@ -366,11 +391,7 @@ export async function POST(request: Request) {
       canUseTools: !isReasoningModel,
       forceGenerateProfiles,
     });
-    const forcedToolChoice =
-      forceGenerateProfiles && !isReasoningModel
-        ? ({ type: "tool", toolName: "generateProfiles" } as const)
-        : undefined;
-    const maxStepCount = forceGenerateProfiles ? 1 : 5;
+    const maxStepCount = 5;
 
     const stream = createUIMessageStream({
       originalMessages: isToolApprovalFlow ? uiMessages : undefined,
@@ -381,7 +402,6 @@ export async function POST(request: Request) {
           system: `${systemPrompt({ selectedChatModel: resolvedChatModel, requestHints })}${runtimeGuidance}`,
           messages: modelMessages,
           stopWhen: stepCountIs(maxStepCount),
-          toolChoice: forcedToolChoice,
           experimental_activeTools: activeTools,
           providerOptions: isReasoningModel
             ? {

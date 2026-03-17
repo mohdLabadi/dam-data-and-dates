@@ -22,6 +22,10 @@ export const createDocument = ({ session, dataStream }: CreateDocumentProps) =>
       kind: z.enum(artifactKinds),
     }),
     execute: async ({ title, kind }) => {
+      if (kind === "profiles") {
+        return { error: "Use the generateProfiles tool to create partner profiles, not createDocument." };
+      }
+
       const id = generateUUID();
 
       dataStream.write({

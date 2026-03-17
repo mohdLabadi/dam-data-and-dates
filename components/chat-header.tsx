@@ -53,9 +53,28 @@ function PureChatHeader({
       }
 
       const matches = (await response.json()) as SavedMatchRecord[];
-      setSavedMatches(matches);
+
+      if (matches.length > 0) {
+        setSavedMatches(matches);
+        // Heal stale localStorage entries (e.g. photos stripped by old code)
+        if (typeof window !== "undefined") {
+          try {
+            window.localStorage.setItem("dam-saved-matches", JSON.stringify(matches));
+          } catch {}
+        }
+      } else {
+        const raw = typeof window !== "undefined"
+          ? window.localStorage.getItem("dam-saved-matches")
+          : null;
+        const local = raw ? (JSON.parse(raw) as SavedMatchRecord[]) : [];
+        setSavedMatches(Array.isArray(local) ? local : []);
+      }
     } catch {
-      setSavedMatches([]);
+      const raw = typeof window !== "undefined"
+        ? window.localStorage.getItem("dam-saved-matches")
+        : null;
+      const local = raw ? (JSON.parse(raw) as SavedMatchRecord[]) : [];
+      setSavedMatches(Array.isArray(local) ? local : []);
     } finally {
       setIsSavedLoading(false);
     }
@@ -64,21 +83,25 @@ function PureChatHeader({
   const removeSavedMatch = async (id: string) => {
     setRemovingId(id);
 
-    try {
-      const response = await fetch(`/api/matches?id=${id}`, {
-        method: "DELETE",
-      });
-
-      if (!response.ok) {
-        throw new Error("failed to remove");
-      }
-
-      setSavedMatches((current) => current.filter((match) => match.id !== id));
-    } catch {
-      // keep UI state unchanged on failure
-    } finally {
-      setRemovingId(null);
+    // Always remove from localStorage
+    if (typeof window !== "undefined") {
+      try {
+        const raw = window.localStorage.getItem("dam-saved-matches");
+        const local = raw ? (JSON.parse(raw) as SavedMatchRecord[]) : [];
+        window.localStorage.setItem(
+          "dam-saved-matches",
+          JSON.stringify(local.filter((m) => m.id !== id)),
+        );
+      } catch {}
     }
+
+    // Also attempt server delete
+    try {
+      await fetch(`/api/matches?id=${id}`, { method: "DELETE" });
+    } catch {}
+
+    setSavedMatches((current) => current.filter((match) => match.id !== id));
+    setRemovingId(null);
   };
 
   const accountLabel =

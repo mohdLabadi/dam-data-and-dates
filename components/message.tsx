@@ -342,13 +342,7 @@ const PurePreviewMessage = ({
                     className="rounded-lg border border-dashed border-border p-4 text-sm text-muted-foreground"
                     key={toolCallId}
                   >
-                    <p className="mb-2">
-                      {rawOutput?.message ??
-                        "Matches were generated, but no profile cards were returned in the expected format."}
-                    </p>
-                    <pre className="overflow-x-auto rounded bg-muted p-2 text-xs">
-                      {JSON.stringify(rawOutput ?? {}, null, 2)}
-                    </pre>
+                    Something went wrong generating your profiles. Please try again.
                   </div>
                 );
               }

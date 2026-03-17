@@ -50,10 +50,19 @@ function writeSavedMatchesToLocalStorage(matches: SavedMatchRecord[]) {
     return;
   }
 
-  window.localStorage.setItem(
-    SAVED_MATCHES_STORAGE_KEY,
-    JSON.stringify(matches),
-  );
+  const stripped = matches.map((m) => ({
+    ...m,
+    profile: { ...m.profile, profilePhotoDataUrl: undefined },
+  }));
+
+  try {
+    window.localStorage.setItem(
+      SAVED_MATCHES_STORAGE_KEY,
+      JSON.stringify(stripped),
+    );
+  } catch {
+    // Quota exceeded — skip local persistence; server is the source of truth
+  }
 }
 
 const profileTypeConfig = {
@@ -105,7 +114,6 @@ function isAntiMatchType(rawType: string | undefined) {
 
 function ProfileCard({
   profile,
-  onSave,
   onRemove,
   isSaved,
   isSaving,
@@ -114,7 +122,6 @@ function ProfileCard({
   onDislike,
 }: {
   profile: PartnerProfile;
-  onSave?: (profile: PartnerProfile) => void;
   onRemove?: () => void;
   isSaved?: boolean;
   isSaving?: boolean;
@@ -232,17 +239,6 @@ function ProfileCard({
 
         {/* Actions */}
         <div className="flex flex-wrap justify-end gap-2">
-          {onSave ? (
-            <button
-              className="flex items-center gap-1.5 rounded-full border border-zinc-200 bg-white px-4 py-1.5 text-sm font-medium text-zinc-700 transition-colors hover:border-amber-300 hover:bg-amber-50 hover:text-amber-700 disabled:cursor-not-allowed disabled:opacity-60 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:border-amber-700 dark:hover:bg-amber-900/20 dark:hover:text-amber-300"
-              disabled={Boolean(isSaved) || Boolean(isSaving)}
-              onClick={() => onSave(profile)}
-              type="button"
-            >
-              {isSaved ? "⭐ Saved" : isSaving ? "Saving..." : "⭐ Save match"}
-            </button>
-          ) : null}
-
           {onRemove ? (
             <button
               className="flex items-center gap-1.5 rounded-full border border-zinc-200 bg-white px-4 py-1.5 text-sm font-medium text-zinc-700 transition-colors hover:border-zinc-400 hover:bg-zinc-100 disabled:cursor-not-allowed disabled:opacity-60 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:border-zinc-500 dark:hover:bg-zinc-700"
@@ -262,11 +258,12 @@ function ProfileCard({
                 👎 Not for me
               </button>
               <button
-                className="flex items-center gap-1.5 rounded-full border border-zinc-200 bg-white px-4 py-1.5 text-sm font-medium text-zinc-700 transition-colors hover:border-green-300 hover:bg-green-50 hover:text-green-600 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:border-green-700 dark:hover:bg-green-900/20 dark:hover:text-green-400"
+                className="flex items-center gap-1.5 rounded-full border border-zinc-200 bg-white px-4 py-1.5 text-sm font-medium text-zinc-700 transition-colors hover:border-green-300 hover:bg-green-50 hover:text-green-600 disabled:cursor-not-allowed disabled:opacity-60 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:border-green-700 dark:hover:bg-green-900/20 dark:hover:text-green-400"
+                disabled={Boolean(isSaved) || Boolean(isSaving)}
                 onClick={() => onLike(profile)}
                 type="button"
               >
-                👍 This is promising
+                {isSaved ? "⭐ Saved" : isSaving ? "Saving..." : "👍 Save & find more like this"}
               </button>
             </>
           )}
@@ -478,19 +475,19 @@ function ProfilesContent({
     }
   };
 
-  const handleLike = (profile: PartnerProfile) => {
+  const handleLike = async (profile: PartnerProfile) => {
     if (!sendMessage) return;
 
-    const docInstruction = metadata?.documentId
-      ? ` Use updateDocument with id ${metadata.documentId}.`
-      : "";
+    if (!isAntiMatchType(profile.type)) {
+      await handleSaveMatch(profile);
+    }
 
     sendMessage({
       role: "user",
       parts: [
         {
           type: "text",
-          text: `I liked ${profile.name}'s profile (${profile.type.replace("_", " ")}). Their traits that stood out to me: ${profile.traits.slice(0, 3).join(", ")}. Please regenerate all four profiles with more matches like this one.${docInstruction}`,
+          text: `I liked ${profile.name}'s profile (${profile.type.replace("_", " ")}). Their traits that stood out to me: ${profile.traits.slice(0, 3).join(", ")}. Please regenerate all four profiles with more matches like this one.`,
         },
       ],
     });
@@ -499,16 +496,12 @@ function ProfilesContent({
   const handleDislike = (profile: PartnerProfile) => {
     if (!sendMessage) return;
 
-    const docInstruction = metadata?.documentId
-      ? ` Use updateDocument with id ${metadata.documentId}.`
-      : "";
-
     sendMessage({
       role: "user",
       parts: [
         {
           type: "text",
-          text: `I didn't connect with ${profile.name}'s profile (${profile.type.replace("_", " ")}). Please regenerate all four profiles and avoid the qualities that made this one feel off.${docInstruction}`,
+          text: `I didn't connect with ${profile.name}'s profile (${profile.type.replace("_", " ")}). Please regenerate all four profiles and avoid the qualities that made this one feel off.`,
         },
       ],
     });
@@ -584,9 +577,6 @@ function ProfilesContent({
               key={profile.id}
               onDislike={handleDislike}
               onLike={handleLike}
-              onSave={
-                isAntiMatchType(profile.type) ? undefined : handleSaveMatch
-              }
               profile={profile}
             />
           ))}
