@@ -252,7 +252,7 @@ export async function POST(request: Request) {
       ? await getMessageCountByUserId({
           id: session.user.id,
           differenceInHours: 24,
-        })
+        }).catch(() => 0)
       : 0;
 
     if (messageCount > entitlementsByUserType[userType].maxMessagesPerDay) {
@@ -270,7 +270,7 @@ export async function POST(request: Request) {
     );
     const isToolApprovalFlow = isToolApprovalFlowMessageSet(incomingMessages);
 
-    const chat = hasDatabase ? await getChatById({ id }) : null;
+    const chat = hasDatabase ? await getChatById({ id }).catch(() => null) : null;
     let messagesFromDb: DBMessage[] = [];
     let titlePromise: Promise<string> | null = null;
 
@@ -279,7 +279,7 @@ export async function POST(request: Request) {
         return new ChatbotError("forbidden:chat").toResponse();
       }
       if (!isToolApprovalFlow && hasDatabase) {
-        messagesFromDb = await getMessagesByChatId({ id });
+        messagesFromDb = await getMessagesByChatId({ id }).catch(() => []);
       }
     } else if (normalizedMessage?.role === "user") {
       if (hasDatabase) {
@@ -288,7 +288,7 @@ export async function POST(request: Request) {
           userId: session.user.id,
           title: "New chat",
           visibility: selectedVisibilityType,
-        });
+        }).catch((err) => console.error("Failed to save chat:", err));
       }
       titlePromise =
         hasDatabase && !isHiddenIntakeSubmission
@@ -325,7 +325,7 @@ export async function POST(request: Request) {
               createdAt: new Date(),
             },
           ],
-        });
+        }).catch((err) => console.error("Failed to save user message:", err));
       }
     }
 
@@ -417,7 +417,7 @@ export async function POST(request: Request) {
               await updateMessage({
                 id: finishedMsg.id,
                 parts: finishedMsg.parts,
-              });
+              }).catch((err) => console.error("Failed to update message:", err));
             } else {
               await saveMessages({
                 messages: [
@@ -430,7 +430,7 @@ export async function POST(request: Request) {
                     chatId: id,
                   },
                 ],
-              });
+              }).catch((err) => console.error("Failed to save message:", err));
             }
           }
         } else if (normalizedFinishedMessages.length > 0) {
@@ -443,7 +443,7 @@ export async function POST(request: Request) {
               attachments: [],
               chatId: id,
             })),
-          });
+          }).catch((err) => console.error("Failed to save finished messages:", err));
         }
       },
       onError: (error) => getStreamErrorMessage(error),
