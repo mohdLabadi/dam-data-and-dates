@@ -1,10 +1,17 @@
 "use client";
 
 import Image from "next/image";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import type { PartnerProfile } from "@/lib/ai/preference-schema";
-import type { SavedMatch } from "@/lib/db/schema";
+
+const SAVED_MATCHES_STORAGE_KEY = "dam-saved-matches";
+
+type MatchRecord = {
+  id: string;
+  profile: unknown;
+  [key: string]: unknown;
+};
 
 const profileTypeConfig: Record<
   string,
@@ -47,7 +54,7 @@ function SavedMatchCard({
   onRemove,
   isRemoving,
 }: {
-  match: SavedMatch;
+  match: MatchRecord;
   onRemove: (id: string) => void;
   isRemoving: boolean;
 }) {
@@ -163,17 +170,38 @@ function SavedMatchCard({
 export function SavedMatchesPage({
   initialMatches,
 }: {
-  initialMatches: SavedMatch[];
+  initialMatches: MatchRecord[];
 }) {
-  const [matches, setMatches] = useState<SavedMatch[]>(initialMatches);
+  const [matches, setMatches] = useState<MatchRecord[]>(initialMatches);
   const [removingId, setRemovingId] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    try {
+      const raw = window.localStorage.getItem(SAVED_MATCHES_STORAGE_KEY);
+      if (!raw) return;
+      const parsed = JSON.parse(raw) as MatchRecord[];
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        setMatches(parsed);
+      }
+    } catch {}
+  }, []);
 
   const handleRemove = async (id: string) => {
     setRemovingId(id);
     try {
       const res = await fetch(`/api/matches?id=${id}`, { method: "DELETE" });
       if (!res.ok) throw new Error();
-      setMatches((current) => current.filter((m) => m.id !== id));
+      setMatches((current) => {
+        const next = current.filter((m) => m.id !== id);
+        if (typeof window !== "undefined") {
+          window.localStorage.setItem(
+            SAVED_MATCHES_STORAGE_KEY,
+            JSON.stringify(next)
+          );
+        }
+        return next;
+      });
       toast.success("Match removed.");
     } catch {
       toast.error("Failed to remove match.");

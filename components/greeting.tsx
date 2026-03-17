@@ -13,7 +13,7 @@ export const Greeting = () => {
         initial={{ opacity: 0, y: 10 }}
         transition={{ delay: 0.5 }}
       >
-        Welcome to your AI matchmaker. Start the conversation with a hello and your AI Matchmaker will take it away.
+        Welcome to your AI matchmaker.
       </motion.div>
     </div>
   );

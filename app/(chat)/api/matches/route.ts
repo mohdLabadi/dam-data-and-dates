@@ -7,6 +7,7 @@ import {
   saveMatch,
 } from "@/lib/db/queries";
 import { ChatbotError } from "@/lib/errors";
+import { generateUUID } from "@/lib/utils";
 
 export async function GET() {
   if (!process.env.POSTGRES_URL) {
@@ -25,16 +26,6 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
-  if (!process.env.POSTGRES_URL) {
-    return new ChatbotError("bad_request:database", "Database is not configured").toResponse();
-  }
-
-  const session = await auth();
-
-  if (!session?.user) {
-    return new ChatbotError("unauthorized:chat").toResponse();
-  }
-
   const {
     documentId,
     profile,
@@ -47,14 +38,36 @@ export async function POST(request: Request) {
     ).toResponse();
   }
 
+  if (!process.env.POSTGRES_URL) {
+    // No DB — return a local-only record; client saves it to localStorage
+    const profileWithoutPhoto: PartnerProfile = {
+      ...profile,
+      profilePhotoDataUrl: undefined,
+    };
+    return Response.json(
+      {
+        id: generateUUID(),
+        createdAt: new Date().toISOString(),
+        userId: "local",
+        documentId,
+        profileId: profile.id,
+        profile: profileWithoutPhoto,
+      },
+      { status: 200 }
+    );
+  }
+
+  const session = await auth();
+
+  if (!session?.user) {
+    return new ChatbotError("unauthorized:chat").toResponse();
+  }
+
   const profilePhotoDataUrl =
     profile.profilePhotoDataUrl ?? (await generateProfilePhotoDataUrl(profile));
 
   const profileWithPhoto: PartnerProfile = profilePhotoDataUrl
-    ? {
-        ...profile,
-        profilePhotoDataUrl,
-      }
+    ? { ...profile, profilePhotoDataUrl }
     : profile;
 
   const match = await saveMatch({
@@ -67,21 +80,22 @@ export async function POST(request: Request) {
 }
 
 export async function DELETE(request: Request) {
+  const { searchParams } = new URL(request.url);
+  const id = searchParams.get("id");
+
+  if (!id) {
+    return new ChatbotError("bad_request:api", "Parameter id is required").toResponse();
+  }
+
   if (!process.env.POSTGRES_URL) {
-    return new ChatbotError("bad_request:database", "Database is not configured").toResponse();
+    // No DB — client handles localStorage removal
+    return Response.json({ id }, { status: 200 });
   }
 
   const session = await auth();
 
   if (!session?.user) {
     return new ChatbotError("unauthorized:chat").toResponse();
-  }
-
-  const { searchParams } = new URL(request.url);
-  const id = searchParams.get("id");
-
-  if (!id) {
-    return new ChatbotError("bad_request:api", "Parameter id is required").toResponse();
   }
 
   const deleted = await deleteSavedMatchById({

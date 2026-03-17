@@ -17,13 +17,10 @@ export default function Page(props: { params: Promise<{ id: string }> }) {
   );
 }
 
+const hasDatabase = Boolean(process.env.POSTGRES_URL);
+
 async function ChatPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const chat = await getChatById({ id });
-
-  if (!chat) {
-    redirect("/");
-  }
 
   const session = await auth();
 
@@ -31,7 +28,13 @@ async function ChatPage({ params }: { params: Promise<{ id: string }> }) {
     redirect("/api/auth/guest");
   }
 
-  if (chat.visibility === "private") {
+  const chat = hasDatabase ? await getChatById({ id }) : null;
+
+  if (hasDatabase && !chat) {
+    redirect("/");
+  }
+
+  if (chat?.visibility === "private") {
     if (!session.user) {
       return notFound();
     }
@@ -41,10 +44,12 @@ async function ChatPage({ params }: { params: Promise<{ id: string }> }) {
     }
   }
 
-  const [messagesFromDb, profileDocument] = await Promise.all([
-    getMessagesByChatId({ id }),
-    getLatestProfileDocumentByChatId({ chatId: id }),
-  ]);
+  const [messagesFromDb, profileDocument] = hasDatabase
+    ? await Promise.all([
+        getMessagesByChatId({ id }),
+        getLatestProfileDocumentByChatId({ chatId: id }),
+      ])
+    : [[], null];
 
   const uiMessages = convertToUIMessages(messagesFromDb);
 
@@ -56,11 +61,11 @@ async function ChatPage({ params }: { params: Promise<{ id: string }> }) {
       <>
         <Chat
           autoResume={true}
-          id={chat.id}
+          id={id}
           initialChatModel={DEFAULT_CHAT_MODEL}
           initialMessages={uiMessages}
-          initialVisibilityType={chat.visibility}
-          isReadonly={session?.user?.id !== chat.userId}
+          initialVisibilityType={chat?.visibility ?? "private"}
+          isReadonly={chat ? session?.user?.id !== chat.userId : false}
           initialProfileDocumentId={profileDocument?.id ?? null}
         />
         <DataStreamHandler />
@@ -72,11 +77,11 @@ async function ChatPage({ params }: { params: Promise<{ id: string }> }) {
     <>
       <Chat
         autoResume={true}
-        id={chat.id}
+        id={id}
         initialChatModel={resolveChatModelId(chatModelFromCookie.value)}
         initialMessages={uiMessages}
-        initialVisibilityType={chat.visibility}
-        isReadonly={session?.user?.id !== chat.userId}
+        initialVisibilityType={chat?.visibility ?? "private"}
+        isReadonly={chat ? session?.user?.id !== chat.userId : false}
         initialProfileDocumentId={profileDocument?.id ?? null}
       />
       <DataStreamHandler />

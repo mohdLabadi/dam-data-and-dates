@@ -10,9 +10,10 @@ export default async function Page() {
     redirect("/login");
   }
 
-  const savedMatches = await getSavedMatchesByUserId({
-    userId: session.user.id,
-  });
+  const hasDatabase = Boolean(process.env.POSTGRES_URL);
+  const savedMatches = hasDatabase
+    ? await getSavedMatchesByUserId({ userId: session.user.id })
+    : [];
 
   return <SavedMatchesPage initialMatches={savedMatches} />;
 }

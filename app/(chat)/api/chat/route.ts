@@ -122,6 +122,19 @@ type ActiveToolName =
   | "requestSuggestions"
   | "generateProfiles";
 
+const SAFE_PART_TYPES = new Set(["text", "reasoning"]);
+
+function stripNonTextParts(messages: ChatMessage[]): ChatMessage[] {
+  return messages
+    .map((msg) => ({
+      ...msg,
+      parts: msg.parts.filter((part) =>
+        SAFE_PART_TYPES.has((part as { type: string }).type)
+      ) as ChatMessage["parts"],
+    }))
+    .filter((msg) => msg.parts.length > 0);
+}
+
 function getUserTextFromMessages(messages: ChatMessage[]) {
   return messages
     .filter((m) => m.role === "user")
@@ -298,7 +311,7 @@ export async function POST(request: Request) {
 
     const uiMessages =
       !hasDatabase && incomingMessages?.length
-        ? incomingMessages
+        ? stripNonTextParts(incomingMessages)
         : isToolApprovalFlow
           ? (incomingMessages ?? [])
           : [...convertToUIMessages(messagesFromDb), normalizedMessage as ChatMessage];

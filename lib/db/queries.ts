@@ -39,11 +39,12 @@ import type { PartnerProfile } from "../ai/preference-schema";
 // use the Drizzle adapter for Auth.js / NextAuth
 // https://authjs.dev/reference/adapter/drizzle
 
+const client = process.env.POSTGRES_URL ? postgres(process.env.POSTGRES_URL) : null;
 // biome-ignore lint: Forbidden non-null assertion.
-const client = postgres(process.env.POSTGRES_URL!);
-const db = drizzle(client);
+const db = client ? drizzle(client) : (null as unknown as ReturnType<typeof drizzle>);
 
 export async function getUser(email: string): Promise<User[]> {
+  if (!client) return [];
   try {
     return await db.select().from(user).where(eq(user.email, email));
   } catch (_error) {

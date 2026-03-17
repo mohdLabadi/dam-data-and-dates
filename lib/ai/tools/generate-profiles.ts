@@ -338,8 +338,8 @@ export const generateProfiles = ({
         });
       }
 
-      // Persist document to DB if user is authenticated and we have content
-      if (session?.user?.id && profilesJson) {
+      // Persist document to DB if DB is configured
+      if (process.env.POSTGRES_URL && session?.user?.id && profilesJson) {
         try {
           await saveDocument({
             id,
