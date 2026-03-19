@@ -6,7 +6,7 @@ import { auth } from "@/app/(auth)/auth";
 import { Chat } from "@/components/chat";
 import { DataStreamHandler } from "@/components/data-stream-handler";
 import { DEFAULT_CHAT_MODEL, resolveChatModelId } from "@/lib/ai/models";
-import { getChatById, getLatestProfileDocumentByChatId, getMessagesByChatId } from "@/lib/db/queries";
+import { getChatById, getMessagesByChatId } from "@/lib/db/queries";
 import { convertToUIMessages } from "@/lib/utils";
 
 export default function Page(props: { params: Promise<{ id: string }> }) {
@@ -44,12 +44,9 @@ async function ChatPage({ params }: { params: Promise<{ id: string }> }) {
     }
   }
 
-  const [messagesFromDb, profileDocument] = hasDatabase
-    ? await Promise.all([
-        getMessagesByChatId({ id }),
-        getLatestProfileDocumentByChatId({ chatId: id }),
-      ])
-    : [[], null];
+  const messagesFromDb = hasDatabase
+    ? await getMessagesByChatId({ id })
+    : [];
 
   const uiMessages = convertToUIMessages(messagesFromDb);
 
@@ -66,7 +63,6 @@ async function ChatPage({ params }: { params: Promise<{ id: string }> }) {
           initialMessages={uiMessages}
           initialVisibilityType={chat?.visibility ?? "private"}
           isReadonly={chat ? session?.user?.id !== chat.userId : false}
-          initialProfileDocumentId={profileDocument?.id ?? null}
         />
         <DataStreamHandler />
       </>
@@ -82,7 +78,6 @@ async function ChatPage({ params }: { params: Promise<{ id: string }> }) {
         initialMessages={uiMessages}
         initialVisibilityType={chat?.visibility ?? "private"}
         isReadonly={chat ? session?.user?.id !== chat.userId : false}
-        initialProfileDocumentId={profileDocument?.id ?? null}
       />
       <DataStreamHandler />
     </>

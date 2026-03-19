@@ -4,6 +4,7 @@ import {
   createUIMessageStream,
   createUIMessageStreamResponse,
   generateId,
+  hasToolCall,
   stepCountIs,
   streamText,
 } from "ai";
@@ -122,17 +123,6 @@ type ActiveToolName =
   | "requestSuggestions"
   | "generateProfiles";
 
-function stripNonTextParts(messages: ChatMessage[]): ChatMessage[] {
-  return messages
-    .map((msg) => ({
-      ...msg,
-      parts: msg.parts.filter((part) => {
-        const type = (part as { type: string }).type;
-        return type === "text" || type === "reasoning";
-      }) as ChatMessage["parts"],
-    }))
-    .filter((msg) => msg.parts.length > 0);
-}
 
 function getUserTextFromMessages(messages: ChatMessage[]) {
   return messages
@@ -191,7 +181,7 @@ function buildMatchmakingRuntimeGuidance({
   forceGenerateProfiles?: boolean;
 }) {
   if (forceGenerateProfiles) {
-    return `\n\nRuntime conversation guidance:\n- The user just submitted their intake form. You now have their full preferences.\n- Do NOT call generateProfiles yet.\n- Follow the Profile Generation Flow: send a single confirmation message with your summary and criteria list (Step 1), then wait for the user's go-ahead before generating.`;
+    return `\n\nRuntime conversation guidance:\n- The user just submitted their intake form. You now have their full preferences.\n- The generateProfiles tool is NOT available yet — you must complete Step 1 first.\n- Send your confirmation summary now: briefly restate what you heard, list the exact criteria, and ask "Does this look right? I'll find your matches once you give me the go-ahead."\n- Do NOT output JSON. Do NOT attempt to call any tool. Just send the confirmation message.`;
   }
 
   const userTexts = getUserTextFromMessages(uiMessages);
@@ -329,7 +319,7 @@ export async function POST(request: Request) {
       : dbHasHistory
         ? [...convertToUIMessages(messagesFromDb), normalizedMessage as ChatMessage]
         : incomingMessages?.length
-          ? stripNonTextParts(incomingMessages)
+          ? incomingMessages
           : [normalizedMessage as ChatMessage];
 
     const { longitude, latitude, city, country } = geolocation(request);
@@ -364,27 +354,29 @@ export async function POST(request: Request) {
 
     const modelMessages = await convertToModelMessages(uiMessages);
 
-    // Only unlock generateProfiles when the user has explicitly confirmed.
-    // This prevents the model from generating profiles mid-conversation or on
-    // ambiguous input like "ijh" — a system-prompt instruction alone is not
-    // reliable enough.
+    // Only unlock generateProfiles when the bot previously asked for confirmation
+    // AND the user replied with any affirmative. Checking the prior assistant message
+    // prevents affirmatives in feedback/answers from accidentally triggering generation.
+    const lastAssistantText = [...uiMessages]
+      .reverse()
+      .find((m) => m.role === "assistant")
+      ?.parts
+      .filter((p): p is Extract<typeof p, { type: "text" }> => p.type === "text")
+      .map((p) => p.text)
+      .join(" ") ?? "";
+    const botJustAskedForConfirmation = /go.?ahead|does this look right|give me the go.?ahead|ready to generate|shall i generate|want me to generate/i.test(lastAssistantText);
+
     const latestUserText = normalizedMessage?.parts
       .filter((p): p is Extract<typeof p, { type: "text" }> => p.type === "text")
       .map((p) => p.text)
       .join(" ")
       .toLowerCase() ?? "";
-    const isExplicitConfirmation = /\b(yes|yeah|yep|yup|ok|okay|sure|go ahead|generate|looks good|that'?s? right|correct|confirmed?|do it|let'?s? go|proceed|sounds good|perfect|great)\b/.test(latestUserText);
-    const canGenerateProfiles = (modelMessages.length >= 3 || forceGenerateProfiles) && isExplicitConfirmation;
+    const userAffirmed = /\b(yes|yeah|yep|yup|ok|okay|sure|go ahead|generate|looks good|looks right|that'?s? right|correct|right|perfect|great|sounds good|do it|proceed|let'?s? go|confirmed?)\b/.test(latestUserText);
+    const canGenerateProfiles = modelMessages.length >= 3 && botJustAskedForConfirmation && userAffirmed;
 
     const activeTools: ActiveToolName[] = isReasoningModel
       ? []
-      : [
-          "getWeather",
-          "createDocument",
-          "updateDocument",
-          "requestSuggestions",
-          ...(canGenerateProfiles ? (["generateProfiles"] as const) : []),
-        ];
+      : canGenerateProfiles ? ["generateProfiles"] : [];
 
     const runtimeGuidance = buildMatchmakingRuntimeGuidance({
       uiMessages,
@@ -401,7 +393,7 @@ export async function POST(request: Request) {
           maxRetries: 0,
           system: `${systemPrompt({ selectedChatModel: resolvedChatModel, requestHints })}${runtimeGuidance}`,
           messages: modelMessages,
-          stopWhen: stepCountIs(maxStepCount),
+          stopWhen: (opts) => stepCountIs(maxStepCount)(opts) || hasToolCall('generateProfiles')(opts),
           experimental_activeTools: activeTools,
           providerOptions: isReasoningModel
             ? {

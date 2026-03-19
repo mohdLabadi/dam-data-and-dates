@@ -6,14 +6,12 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import useSWR from "swr";
 import { ChatHeader } from "@/components/chat-header";
-import { useArtifact, useArtifactSelector } from "@/hooks/use-artifact";
 import { useAutoResume } from "@/hooks/use-auto-resume";
 import { INTAKE_MESSAGE_PREFIX } from "@/lib/constants";
 import type { Vote } from "@/lib/db/schema";
 import { ChatbotError } from "@/lib/errors";
 import type { Attachment, ChatMessage } from "@/lib/types";
 import { fetcher, fetchWithErrorHandlers, generateUUID } from "@/lib/utils";
-import { Artifact } from "./artifact";
 import { useDataStream } from "./data-stream-provider";
 import { IntakeForm } from "./intake-form";
 import { Messages } from "./messages";
@@ -114,7 +112,6 @@ export function Chat({
   initialVisibilityType,
   isReadonly,
   autoResume,
-  initialProfileDocumentId,
 }: {
   id: string;
   initialMessages: ChatMessage[];
@@ -122,7 +119,6 @@ export function Chat({
   initialVisibilityType: VisibilityType;
   isReadonly: boolean;
   autoResume: boolean;
-  initialProfileDocumentId?: string | null;
 }) {
   const router = useRouter();
   const visibilityType: VisibilityType = "private";
@@ -234,18 +230,6 @@ export function Chat({
   );
 
   const [attachments, setAttachments] = useState<Attachment[]>([]);
-  const isArtifactVisible = useArtifactSelector((state) => state.isVisible);
-  const { setArtifact } = useArtifact();
-
-  useEffect(() => {
-    if (initialProfileDocumentId) {
-      setArtifact((current) => ({
-        ...current,
-        isVisible: current.kind === "profiles" ? false : current.isVisible,
-      }));
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [initialProfileDocumentId]);
 
   useAutoResume({
     autoResume,
@@ -288,7 +272,6 @@ export function Chat({
           <Messages
             addToolApprovalResponse={addToolApprovalResponse}
             chatId={id}
-            isArtifactVisible={isArtifactVisible}
             isReadonly={isReadonly}
             messages={messages}
             regenerate={regenerate}
@@ -319,24 +302,6 @@ export function Chat({
         </div>
       </div>
 
-      <Artifact
-        addToolApprovalResponse={addToolApprovalResponse}
-        attachments={attachments}
-        chatId={id}
-        input={input}
-        isReadonly={isReadonly}
-        messages={messages}
-        regenerate={regenerate}
-        selectedModelId={initialChatModel}
-        selectedVisibilityType={visibilityType}
-        sendMessage={sendMessage}
-        setAttachments={setAttachments}
-        setInput={setInput}
-        setMessages={setMessages}
-        status={status}
-        stop={stop}
-        votes={votes}
-      />
     </>
   );
 }

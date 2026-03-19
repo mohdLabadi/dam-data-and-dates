@@ -599,7 +599,6 @@ export const profilesArtifact = new Artifact<"profiles", ProfilesMetadata>({
         ...draft,
         content: draft.content + streamPart.data,
         status: "streaming",
-        isVisible: true,
       }));
     }
   },
