@@ -40,6 +40,11 @@ export const {
     Credentials({
       credentials: {},
       async authorize({ email, password }: any) {
+        if (!process.env.POSTGRES_URL) {
+          await compare(password, DUMMY_PASSWORD);
+          return null;
+        }
+
         const users = await getUser(email);
 
         if (users.length === 0) {
@@ -67,16 +72,22 @@ export const {
       id: "guest",
       credentials: {},
       async authorize() {
+        const timestamp = Date.now();
+        const localGuest = {
+          id: `guest-${timestamp}`,
+          email: `guest-${timestamp}@local.dev`,
+          type: "guest" as const,
+        };
+
+        if (!process.env.POSTGRES_URL) {
+          return localGuest;
+        }
+
         try {
           const [guestUser] = await createGuestUser();
           return { ...guestUser, type: "guest" };
         } catch (_error) {
-          const timestamp = Date.now();
-          return {
-            id: `guest-${timestamp}`,
-            email: `guest-${timestamp}@local.dev`,
-            type: "guest",
-          };
+          return localGuest;
         }
       },
     }),

@@ -13,8 +13,7 @@ export type ActivityLevel = "sedentary" | "moderate" | "active" | "very_active";
 export type ProfileType =
   | "close_match"
   | "moderate_stretch"
-  | "exploratory"
-  | "anti_match";
+  | "exploratory";
 
 export interface PreferenceState {
   // Core demographics

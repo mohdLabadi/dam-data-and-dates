@@ -55,6 +55,10 @@ export const register = async (
   _: RegisterActionState,
   formData: FormData
 ): Promise<RegisterActionState> => {
+  if (!process.env.POSTGRES_URL) {
+    return { status: "failed" };
+  }
+
   try {
     const validatedData = authFormSchema.parse({
       email: formData.get("email"),

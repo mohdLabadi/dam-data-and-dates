@@ -16,6 +16,12 @@ import {
 import { PlusIcon } from "./icons";
 import { guestRegex } from "@/lib/constants";
 import type { VisibilityType } from "./visibility-selector";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 type SavedMatchRecord = {
   id: string;
@@ -128,17 +134,26 @@ function PureChatHeader({
           Saved Matches
         </Button>
 
-        <Button
-          className="h-8 px-2 md:h-fit md:px-2"
-          onClick={() => {
-            router.push("/");
-            router.refresh();
-          }}
-          variant="outline"
-        >
-          <PlusIcon />
-          <span className="md:sr-only">New Session</span>
-        </Button>
+        <TooltipProvider delayDuration={200}>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                className="h-8 px-2 md:h-fit md:px-2"
+                onClick={() => {
+                  router.push("/");
+                  router.refresh();
+                }}
+                variant="outline"
+              >
+                <PlusIcon />
+                <span className="md:sr-only">New Session</span>
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="bottom">
+              Start a new chat session
+            </TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
 
         <DropdownMenu>
           <DropdownMenuTrigger asChild>

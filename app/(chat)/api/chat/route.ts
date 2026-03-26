@@ -204,16 +204,33 @@ function buildMatchmakingRuntimeGuidance({
       conversation
     );
 
-  // If profiles have already been generated, don't nudge the model to call
+  // If profiles were successfully generated, don't nudge the model to call
   // generateProfiles again — let the system prompt's post-swipe flow handle it.
-  const profilesAlreadyGenerated = uiMessages.some(
+  const profilesSuccessfullyGenerated = uiMessages.some(
     (m) =>
       m.role === "assistant" &&
-      m.parts.some((p) => (p as { type: string }).type === "tool-generateProfiles")
+      m.parts.some((p) => {
+        if ((p as { type: string }).type !== "tool-generateProfiles") return false;
+        const output = (p as { output?: { profileSet?: { profiles?: unknown[] } | null } }).output;
+        return Boolean(output?.profileSet?.profiles?.length);
+      })
   );
 
-  if (profilesAlreadyGenerated) {
+  // A generation was attempted but returned no profiles (tool call failed or timed out).
+  const lastGenerationFailed =
+    !profilesSuccessfullyGenerated &&
+    uiMessages.some(
+      (m) =>
+        m.role === "assistant" &&
+        m.parts.some((p) => (p as { type: string }).type === "tool-generateProfiles")
+    );
+
+  if (profilesSuccessfullyGenerated) {
     return "";
+  }
+
+  if (lastGenerationFailed) {
+    return `\n\nRuntime conversation guidance:\n- The last profile generation attempt failed and returned no profiles.\n- Do NOT describe profiles as text in the chat — only the generateProfiles tool can display them.\n- Return to Step 1: send a fresh preferences confirmation message listing all criteria, then ask "Does this look right? I'll find your matches once you give me the go-ahead."\n- Wait for the user to affirm before trying to generate again.`;
   }
 
   const hasEnoughContext =

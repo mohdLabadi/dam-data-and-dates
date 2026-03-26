@@ -39,6 +39,10 @@ export async function GET(request: Request) {
 }
 
 export async function PATCH(request: Request) {
+  if (!process.env.POSTGRES_URL) {
+    return new Response("OK", { status: 200 });
+  }
+
   const {
     chatId,
     messageId,

@@ -125,8 +125,8 @@ function buildIntakePrompt(values: IntakeValues) {
     `Smoking preference: ${labelByValue(values.smokingPreference, smokingOptions)}`,
     `Drinking preference: ${labelByValue(values.drinkingPreference, drinkingOptions)}`,
     `Hobbies and interests: ${values.hobbies.length > 0 ? values.hobbies.join(", ") : "Not provided"}`,
-    `Top partner qualities: ${values.partnerQualities.length > 0 ? values.partnerQualities.join(", ") : "Not provided"}`,
-    `Values that matter most: ${values.values.length > 0 ? values.values.join(", ") : "Not provided"}`,
+    `Top qualities I want in a partner: ${values.partnerQualities.length > 0 ? values.partnerQualities.join(", ") : "Not provided"}`,
+    `My own core values (what matters to me fundamentally): ${values.values.length > 0 ? values.values.join(", ") : "Not provided"}`,
     `Dealbreakers: ${values.dealbreakers.length > 0 ? values.dealbreakers.join(", ") : "Not provided"}`,
     `Lifestyle notes: ${truncate(values.lifestyle, 220) || "Not provided"}`,
     "Please create profiles immediately, then we can refine together in chat. Do not ask additional intake questions first.",
@@ -138,12 +138,14 @@ function buildIntakePrompt(values: IntakeValues) {
 function TagInput({
   id,
   label,
+  description,
   placeholder,
   tags,
   onChange,
 }: {
   id: string;
   label: string;
+  description?: string;
   placeholder: string;
   tags: string[];
   onChange: (nextTags: string[]) => void;
@@ -171,6 +173,9 @@ function TagInput({
   return (
     <div className="flex flex-col gap-2">
       <Label htmlFor={id}>{label}</Label>
+      {description && (
+        <p className="text-xs text-muted-foreground -mt-1">{description}</p>
+      )}
       <div className="rounded-md border bg-background p-2">
         <div className="mb-2 flex flex-wrap gap-2">
           {tags.map((tag) => (
@@ -635,6 +640,7 @@ export function IntakeForm({
               <TagInput
                 id="partnerQualities"
                 label="Top partner qualities *"
+                description="What you want in the other person."
                 onChange={(next) =>
                   setValues((prev) => ({ ...prev, partnerQualities: next }))
                 }
@@ -647,6 +653,7 @@ export function IntakeForm({
               <TagInput
                 id="values"
                 label="Core values"
+                description="What matters to you fundamentally."
                 onChange={(next) =>
                   setValues((prev) => ({ ...prev, values: next }))
                 }

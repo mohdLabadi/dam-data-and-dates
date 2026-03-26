@@ -104,20 +104,13 @@ export const profileGenerationSystemPrompt = `You are a creative writer speciali
 1. **close_match**: Closely aligns with stated preferences across demographics AND personality
 2. **moderate_stretch**: Matches on the most important preferences but varies on 1-2 secondary ones
 3. **exploratory**: Shares core values but differs in interesting ways — the unexpected connection
-4. **anti_match**: Intentionally poor fit that contrasts the user's stated preferences for comparison
 
 ## Required Mix
 - Return exactly 4 profiles.
 - Include one close_match profile.
 - Include one moderate_stretch profile.
-- Include one exploratory profile.
-- Include one anti_match profile.
-- IMPORTANT: In JSON, the type field must be exactly one of: "close_match", "moderate_stretch", "exploratory", "anti_match".
-- The anti_match profile should be visibly unsuitable and should mention key mismatches in compatibilityNotes and challengePoint.
-- The anti_match should explicitly invert the user's desired interpersonal qualities when possible.
-- Example inversions: kind -> dismissive/rude, emotionally available -> emotionally distant, values family -> avoids commitment, communicator -> evasive.
-- For anti_match, if the user specifies a preference, try to produce the opposite direction for that dimension (age range, distance/location, lifestyle, values, and interpersonal traits).
-- Anti-match should maximize mismatch across as many specified preference fields as possible, not just one or two.
+- Include two exploratory profiles.
+- IMPORTANT: In JSON, the type field must be exactly one of: "close_match", "moderate_stretch", "exploratory".
 
 ## Demographic Matching Rules
 - ALWAYS respect hard constraints (dealbreakers, hardConstraints array) — never violate them
@@ -129,14 +122,12 @@ export const profileGenerationSystemPrompt = `You are a creative writer speciali
 - Education: respect stated preference for close_match
 - Political views: if stated, match for close_match; others may differ slightly
 - Location: place profiles within the stated distance range
-- Exception for anti_match only: it may intentionally violate stated preferences and dealbreakers to create a clearly poor fit for comparison.
 
 ## Profile Quality Standards
 - Make each person feel like a real, specific human being
 - Write the bio in first person (150-200 words), revealing personality through specific details and stories
 - Avoid stereotypes and clichés
-- Compatibility score: close_match 80-95, moderate_stretch 65-80, exploratory 50-70, anti_match 5-35
-- For anti_match, include at least 2-3 clearly negative fit signals in traits, bio, or behavior description.
+- Compatibility score: close_match 80-95, moderate_stretch 65-80, exploratory 50-70
 
 ## Output Format
 Output ONLY valid JSON. No markdown, no explanation, no code blocks. Use this EXACT structure:
@@ -178,7 +169,6 @@ Your task:
 - Generate 4 genuinely new people (not tweaks of existing ones) whose traits, occupations, bios, and lifestyles reflect this refined understanding
 - The close_match profile should strongly mirror the liked profiles' winning qualities
 - The moderate_stretch and exploratory profiles should share core values but vary in interesting ways
-- The anti_match should contrast clearly with the liked profiles
 - Do NOT reuse names, occupations, or bios from the existing profiles
 
 Output ONLY valid JSON in the same format as the original profiles. No markdown, no explanation.`;

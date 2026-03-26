@@ -8,7 +8,6 @@ import {
 import { generateProfilePhotoDataUrl } from "@/lib/ai/profile-photos";
 import type {
   PartnerProfile,
-  PreferenceState,
   ProfileSet,
 } from "@/lib/ai/preference-schema";
 import { getArtifactModel } from "@/lib/ai/providers";
@@ -20,129 +19,6 @@ type GenerateProfilesProps = {
   chatId: string;
 };
 
-function buildAntiMatchMismatchSignals(preferences: PreferenceState) {
-  const signals: string[] = [];
-
-  if (preferences.ageRange) {
-    signals.push("outside preferred age range");
-  }
-  if (preferences.genderPreference) {
-    signals.push("outside stated gender preference");
-  }
-  if (preferences.location || preferences.maxDistanceMiles) {
-    signals.push("outside preferred location/distance");
-  }
-  if (preferences.heightPreference) {
-    signals.push("does not match stated height preference");
-  }
-  if (preferences.ethnicityPreference) {
-    signals.push("does not match stated ethnicity preference");
-  }
-  if (preferences.religionPreference) {
-    signals.push("does not match stated religion preference");
-  }
-  if (preferences.educationPreference) {
-    signals.push("does not match stated education preference");
-  }
-  if (preferences.politicalViewsPreference) {
-    signals.push("conflicts with stated political preference");
-  }
-  if (preferences.smokingPreference) {
-    signals.push("smoking habits conflict with stated preference");
-  }
-  if (preferences.drinkingPreference) {
-    signals.push("drinking habits conflict with stated preference");
-  }
-  if (preferences.personalityTraits.length > 0) {
-    signals.push("personality conflicts with desired traits");
-  }
-  if (preferences.coreValues.length > 0) {
-    signals.push("core values conflict with what user wants");
-  }
-
-  return signals;
-}
-
-function ensureAntiMatchProfile(
-  profiles: PartnerProfile[],
-  preferences: PreferenceState
-): PartnerProfile[] {
-  const trimmedProfiles = profiles.slice(0, 4);
-
-  if (trimmedProfiles.length === 0) {
-    return trimmedProfiles;
-  }
-
-  const normalizeType = (type: string | undefined) =>
-    (type ?? "")
-      .toLowerCase()
-      .trim()
-      .replace(/[\s-]+/g, "_");
-
-  const antiIndexes = trimmedProfiles
-    .map((profile, index) => ({
-      index,
-      normalizedType: normalizeType(profile.type),
-    }))
-    .filter(({ normalizedType }) => normalizedType === "anti_match")
-    .map(({ index }) => index);
-
-  const lowestScoreIndex = trimmedProfiles.reduce((minIndex, current, index, arr) =>
-    current.compatibilityScore < arr[minIndex].compatibilityScore ? index : minIndex
-  , 0);
-
-  const primaryAntiIndex = antiIndexes[0] ?? lowestScoreIndex;
-  const mismatchSignals = buildAntiMatchMismatchSignals(preferences);
-
-  return trimmedProfiles.map((profile, index) => {
-    if (index === primaryAntiIndex) {
-      const antiNotesPrefix =
-        "Intentional anti-match for comparison: this profile conflicts with core preferences.";
-      const antiChallengePrefix =
-        "Intentional anti-match: multiple stated preferences are not satisfied.";
-      const negativeTraitDefaults = ["dismissive", "self-centered", "inconsistent"];
-      const existingTraits = Array.isArray(profile.traits) ? profile.traits : [];
-      const mergedTraits = Array.from(
-        new Set([...existingTraits, ...negativeTraitDefaults])
-      ).slice(0, 5);
-      const mismatchSummary =
-        mismatchSignals.length > 0
-          ? ` Key mismatches: ${mismatchSignals.slice(0, 5).join(", ")}.`
-          : "";
-      const preferredLocation = preferences.location?.trim();
-      const oppositeLocation = preferredLocation
-        ? `Far from ${preferredLocation}`
-        : profile.location;
-      const forcedAge = preferences.ageRange
-        ? Math.max(preferences.ageRange.max + 7, profile.age)
-        : profile.age;
-
-      return {
-        ...profile,
-        type: "anti_match",
-        age: forcedAge,
-        location: oppositeLocation,
-        compatibilityScore: Math.min(profile.compatibilityScore, 25),
-        traits: mergedTraits,
-        compatibilityNotes: profile.compatibilityNotes?.includes("Intentional anti-match")
-          ? profile.compatibilityNotes
-          : `${antiNotesPrefix}${mismatchSummary} ${profile.compatibilityNotes}`,
-        challengePoint: profile.challengePoint?.includes("Intentional anti-match")
-          ? profile.challengePoint
-          : `${antiChallengePrefix}${mismatchSummary} ${profile.challengePoint}`,
-      };
-    }
-
-    if (antiIndexes.includes(index)) {
-      return {
-        ...profile,
-        type: "exploratory",
-      };
-    }
-
-    return profile;
-  });
-}
 
 function parseProfileSetFromJson(input: string): ProfileSet | null {
   try {
@@ -174,7 +50,7 @@ export const generateProfiles = ({
 }: GenerateProfilesProps) =>
   tool({
     description:
-      "Generate 4 romantic partner profiles based on gathered preferences: close_match, moderate_stretch, exploratory, and one explicitly labeled anti_match for comparison. Only call this after a multi-turn conversation where you have collected meaningful preference information from the user (relationship goal, plus at least a few other preferences like age range, gender, location, or lifestyle). Do NOT call this on the first message or before gathering preferences.",
+      "Generate 4 romantic partner profiles based on gathered preferences: one close_match, one moderate_stretch, and two exploratory profiles. Only call this after a multi-turn conversation where you have collected meaningful preference information from the user (relationship goal, plus at least a few other preferences like age range, gender, location, or lifestyle). Do NOT call this on the first message or before gathering preferences.",
     inputSchema: z.object({
       preferences: z.object({
         // Core demographics
@@ -221,7 +97,7 @@ export const generateProfiles = ({
         drinkingPreference: z
           .enum(["dealbreaker", "ok", "social_ok"])
           .optional()
-          .describe("How the user feels about a partner who drinks"),
+          .describe("How the user feels about a partner who drinks. Use 'ok' when the user says they are 'open', have no preference, or are fine with any level of drinking. Use 'social_ok' for social or occasional drinking only. Use 'dealbreaker' if heavy drinking is unacceptable."),
         educationPreference: z
           .string()
           .optional()
@@ -242,12 +118,12 @@ export const generateProfiles = ({
           .array(z.string())
           .optional()
           .default([])
-          .describe("Personality traits the user values in a partner"),
+          .describe("Qualities and traits the user wants in a partner (e.g. kind, emotionally available, ambitious)"),
         coreValues: z
           .array(z.string())
           .optional()
           .default([])
-          .describe("Core values the user wants in a partner"),
+          .describe("The user's own fundamental values — what matters most to them personally (e.g. family-oriented, growth mindset). Use these to find a partner who shares or respects those values."),
         dealbreakers: z
           .array(z.string())
           .optional()
@@ -291,13 +167,15 @@ export const generateProfiles = ({
           const parsed = JSON.parse(cleaned) as ProfileSet;
 
           if (Array.isArray(parsed.profiles) && parsed.profiles.length > 0) {
-            const normalizedProfiles = ensureAntiMatchProfile(
-              parsed.profiles,
-              preferences
-            );
+            const PHOTO_TIMEOUT_MS = 12_000;
             const enrichedProfiles = await Promise.all(
-              normalizedProfiles.map(async (profile) => {
-                const profilePhotoDataUrl = await generateProfilePhotoDataUrl(profile);
+              parsed.profiles.slice(0, 4).map(async (profile: PartnerProfile) => {
+                const profilePhotoDataUrl = await Promise.race([
+                  generateProfilePhotoDataUrl(profile),
+                  new Promise<null>((resolve) =>
+                    setTimeout(() => resolve(null), PHOTO_TIMEOUT_MS)
+                  ),
+                ]);
 
                 if (!profilePhotoDataUrl) {
                   return profile;
@@ -360,7 +238,7 @@ export const generateProfiles = ({
         profiles: profileSet?.profiles,
         preferencesSummary: profileSet?.preferencesSummary,
         message:
-          "I've generated 4 partner profiles based on your preferences, including one intentional anti-match for comparison. They're displayed right here in chat. Click 👍 or 👎 on any profile to refine your matches, or tell me what you'd like to adjust.",
+          "I've generated 4 partner profiles based on your preferences. They're displayed right here in chat. Click 👍 or 👎 on any profile to refine your matches, or tell me what you'd like to adjust.",
       };
     },
   });

@@ -103,14 +103,6 @@ function getProfileTypeConfig(rawType: string | undefined) {
   return profileTypeConfig.exploratory;
 }
 
-function isAntiMatchType(rawType: string | undefined) {
-  const normalized = (rawType ?? "")
-    .toLowerCase()
-    .trim()
-    .replace(/[\s-]+/g, "_");
-
-  return normalized === "anti_match" || normalized.includes("anti");
-}
 
 function ProfileCard({
   profile,
@@ -478,9 +470,7 @@ function ProfilesContent({
   const handleLike = async (profile: PartnerProfile) => {
     if (!sendMessage) return;
 
-    if (!isAntiMatchType(profile.type)) {
-      await handleSaveMatch(profile);
-    }
+    await handleSaveMatch(profile);
 
     sendMessage({
       role: "user",
@@ -570,7 +560,6 @@ function ProfilesContent({
           {profileSet.profiles.map((profile) => (
             <ProfileCard
               isSaved={
-                !isAntiMatchType(profile.type) &&
                 savedProfileKeys.has(`${metadata?.documentId}:${profile.id}`)
               }
               isSaving={savingProfileId === profile.id}
