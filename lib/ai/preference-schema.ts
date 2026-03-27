@@ -1,8 +1,12 @@
 export type RelationshipGoal =
+  | "dating"
   | "casual"
   | "serious"
   | "marriage"
   | "friendship"
+  | "collaboration"
+  | "networking"
+  | "employee"
   | "open"
   | "exploring";
 

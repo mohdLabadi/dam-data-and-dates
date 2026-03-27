@@ -61,9 +61,13 @@ const initialValues: IntakeValues = {
 };
 
 const relationshipGoals = [
+  { value: "dating", label: "Dating" },
   { value: "serious", label: "Serious relationship" },
   { value: "casual", label: "Casual dating" },
   { value: "friendship", label: "Friendship" },
+  { value: "collaboration", label: "Collab" },
+  { value: "networking", label: "Networking" },
+  { value: "employee", label: "Empoloyee" },
   { value: "open", label: "Open to possibilities" },
 ];
 
@@ -280,8 +284,8 @@ function WelcomeScreen({ onAcknowledge }: { onAcknowledge: () => void }) {
               <p>
                 Your answers are sent to an AI language model (Google Gemini)
                 which interprets your preferences and generates fictional but
-                plausible profiles. No real person&apos;s data is used.
-                Profiles are generated fresh each session.
+                plausible profiles. No real person&apos;s data is used. Profiles
+                are generated fresh each session.
               </p>
             </div>
 

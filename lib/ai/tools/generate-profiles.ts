@@ -81,7 +81,18 @@ export const generateProfiles = ({
 
         // Relationship goal
         relationshipGoal: z
-          .enum(["casual", "serious", "marriage", "friendship", "open", "exploring"])
+          .enum([
+            "dating",
+            "casual",
+            "serious",
+            "marriage",
+            "friendship",
+            "collaboration",
+            "networking",
+            "employee",
+            "open",
+            "exploring",
+          ])
           .optional()
           .describe("What kind of relationship the user is seeking"),
 

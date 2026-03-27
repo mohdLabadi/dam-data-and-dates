@@ -192,7 +192,7 @@ function buildMatchmakingRuntimeGuidance({
 
   const conversation = userTexts.join("\n").toLowerCase();
   const hasRelationshipGoal =
-    /\b(friendship|platonic|serious|committed|casual|marriage|open|exploring|long[-\s]?term)\b/.test(
+    /\b(dating|friendship|platonic|serious|committed|casual|marriage|collaboration|networking|employee|open|exploring|long[-\s]?term)\b/.test(
       conversation
     );
   const asksForMatches =
