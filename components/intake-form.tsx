@@ -98,6 +98,7 @@ const smokingOptions = [
 ];
 
 const drinkingOptions = [
+  { value: "no_drinking", label: "No drinking" },
   { value: "social_ok", label: "Social drinking is okay" },
   { value: "dealbreaker", label: "Heavy drinking is a dealbreaker" },
   { value: "ok", label: "Open to any drinking style" },

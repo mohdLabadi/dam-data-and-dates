@@ -106,9 +106,9 @@ export const generateProfiles = ({
           .optional()
           .describe("How the user feels about a partner who smokes"),
         drinkingPreference: z
-          .enum(["dealbreaker", "ok", "social_ok"])
+          .enum(["dealbreaker", "ok", "social_ok", "no_drinking"])
           .optional()
-          .describe("How the user feels about a partner who drinks. Use 'ok' when the user says they are 'open', have no preference, or are fine with any level of drinking. Use 'social_ok' for social or occasional drinking only. Use 'dealbreaker' if heavy drinking is unacceptable."),
+          .describe("How the user feels about a partner who drinks. Use 'no_drinking' when the user explicitly wants a non-drinker partner. Use 'ok' when the user says they are 'open', have no preference, or are fine with any level of drinking. Use 'social_ok' for social or occasional drinking only. Use 'dealbreaker' if heavy drinking is unacceptable."),
         educationPreference: z
           .string()
           .optional()

@@ -21,6 +21,7 @@ import { getWeather } from "@/lib/ai/tools/get-weather";
 import { requestSuggestions } from "@/lib/ai/tools/request-suggestions";
 import { updateDocument } from "@/lib/ai/tools/update-document";
 import { INTAKE_MESSAGE_PREFIX, isProductionEnvironment } from "@/lib/constants";
+import type { PreferenceState, RelationshipGoal } from "@/lib/ai/preference-schema";
 import {
   createStreamId,
   deleteChatById,
@@ -123,6 +124,189 @@ type ActiveToolName =
   | "requestSuggestions"
   | "generateProfiles";
 
+type PersistentUserProfile = {
+  preferences: PreferenceState;
+  summary: {
+    relationshipGoalKnown: boolean;
+    ageRangeKnown: boolean;
+    locationKnown: boolean;
+    dealbreakersCount: number;
+    likedTraitsCount: number;
+  };
+  feedback: {
+    likedTraits: string[];
+    avoidTraits: string[];
+  };
+};
+
+function pushUniqueCaseInsensitive(target: string[], value: string, max = 20) {
+  const normalized = value.trim();
+  if (!normalized) return;
+  if (target.some((item) => item.toLowerCase() === normalized.toLowerCase())) return;
+  target.push(normalized);
+  if (target.length > max) {
+    target.splice(max);
+  }
+}
+
+function splitCsvLikeList(input: string) {
+  return input
+    .split(/[;,]/)
+    .map((item) => item.trim())
+    .filter(Boolean);
+}
+
+function mapRelationshipGoal(raw: string): RelationshipGoal | undefined {
+  const value = raw.toLowerCase();
+  if (value.includes("serious") || value.includes("long-term")) return "serious";
+  if (value.includes("casual")) return "casual";
+  if (value.includes("friend")) return "friendship";
+  if (value.includes("collab")) return "collaboration";
+  if (value.includes("network")) return "networking";
+  if (value.includes("employee")) return "employee";
+  if (value.includes("marriage")) return "marriage";
+  if (value.includes("explor")) return "exploring";
+  if (value.includes("open")) return "open";
+  if (value.includes("dating")) return "dating";
+  return undefined;
+}
+
+function buildPersistentUserProfile(uiMessages: ChatMessage[]): PersistentUserProfile {
+  const preferences: PreferenceState = {
+    personalityTraits: [],
+    coreValues: [],
+    dealbreakers: [],
+    hardConstraints: [],
+  };
+  const likedTraits: string[] = [];
+  const avoidTraits: string[] = [];
+
+  const userTexts = getUserTextFromMessages(uiMessages).map(stripIntakePrefix);
+
+  for (const text of userTexts) {
+    const lower = text.toLowerCase();
+
+    const lineEntries = text
+      .split("\n")
+      .map((line) => line.trim())
+      .map((line) => {
+        const idx = line.indexOf(":");
+        if (idx <= 0) return null;
+        return {
+          key: line.slice(0, idx).trim().toLowerCase(),
+          value: line.slice(idx + 1).trim(),
+        };
+      })
+      .filter((item): item is { key: string; value: string } => Boolean(item));
+
+    for (const { key, value } of lineEntries) {
+      if (!value || value.toLowerCase() === "not provided") continue;
+
+      if (key === "connection goal") {
+        const mapped = mapRelationshipGoal(value);
+        if (mapped) preferences.relationshipGoal = mapped;
+      } else if (key === "age range preference") {
+        const match = value.match(/(\d{2})\s*-\s*(\d{2})/);
+        if (match) {
+          preferences.ageRange = {
+            min: Number(match[1]),
+            max: Number(match[2]),
+          };
+        }
+      } else if (key === "interested in") {
+        preferences.genderPreference = value;
+      } else if (key === "location and distance preference") {
+        preferences.location = value;
+      } else if (key === "maximum distance") {
+        const miles = Number(value.replace(/[^\d]/g, ""));
+        if (Number.isFinite(miles) && miles > 0) {
+          preferences.maxDistanceMiles = miles;
+        }
+      } else if (key === "religion preference") {
+        preferences.religionPreference = value;
+      } else if (key === "smoking preference") {
+        const v = value.toLowerCase();
+        if (v.includes("dealbreaker")) preferences.smokingPreference = "dealbreaker";
+        else if (v.includes("non-smoker")) preferences.smokingPreference = "prefer_non_smoker";
+        else if (v.includes("okay") || v.includes("ok")) preferences.smokingPreference = "ok";
+      } else if (key === "drinking preference") {
+        const v = value.toLowerCase();
+        if (v.includes("no drinking") || v.includes("non-drink")) {
+          preferences.drinkingPreference = "no_drinking";
+        } else if (v.includes("social")) {
+          preferences.drinkingPreference = "social_ok";
+        } else if (v.includes("dealbreaker")) {
+          preferences.drinkingPreference = "dealbreaker";
+        } else if (v.includes("open") || v.includes("ok") || v.includes("okay")) {
+          preferences.drinkingPreference = "ok";
+        }
+      } else if (key === "top qualities i want in a partner") {
+        for (const trait of splitCsvLikeList(value)) {
+          pushUniqueCaseInsensitive(preferences.personalityTraits, trait);
+        }
+      } else if (key.startsWith("my own core values")) {
+        for (const coreValue of splitCsvLikeList(value)) {
+          pushUniqueCaseInsensitive(preferences.coreValues, coreValue);
+        }
+      } else if (key === "dealbreakers") {
+        for (const dealbreaker of splitCsvLikeList(value)) {
+          pushUniqueCaseInsensitive(preferences.dealbreakers, dealbreaker);
+          pushUniqueCaseInsensitive(preferences.hardConstraints, dealbreaker);
+        }
+      } else if (key === "lifestyle notes") {
+        preferences.otherNotes = value;
+      }
+    }
+
+    if (!preferences.relationshipGoal) {
+      const inferredGoal = mapRelationshipGoal(text);
+      if (inferredGoal) preferences.relationshipGoal = inferredGoal;
+    }
+
+    const likedTraitsMatch = text.match(
+      /traits that stood out to me:\s*([^.\n]+)/i,
+    );
+    if (likedTraitsMatch?.[1]) {
+      for (const trait of splitCsvLikeList(likedTraitsMatch[1])) {
+        pushUniqueCaseInsensitive(likedTraits, trait);
+        pushUniqueCaseInsensitive(preferences.personalityTraits, trait);
+      }
+    }
+
+    const avoidMatch =
+      text.match(/avoid\s+([^.\n]+)/i) ??
+      text.match(/didn'?t connect.*?(?:because|since)\s*([^.\n]+)/i);
+    if (avoidMatch?.[1]) {
+      for (const trait of splitCsvLikeList(avoidMatch[1])) {
+        pushUniqueCaseInsensitive(avoidTraits, trait);
+        pushUniqueCaseInsensitive(preferences.dealbreakers, trait);
+      }
+    }
+
+    if (/non[-\s]?smoker|no smoking/i.test(lower)) {
+      preferences.smokingPreference = "prefer_non_smoker";
+    }
+    if (/no drinking|non[-\s]?drink/i.test(lower)) {
+      preferences.drinkingPreference = "no_drinking";
+    }
+  }
+
+  return {
+    preferences,
+    summary: {
+      relationshipGoalKnown: Boolean(preferences.relationshipGoal),
+      ageRangeKnown: Boolean(preferences.ageRange),
+      locationKnown: Boolean(preferences.location),
+      dealbreakersCount: preferences.dealbreakers.length,
+      likedTraitsCount: likedTraits.length,
+    },
+    feedback: {
+      likedTraits,
+      avoidTraits,
+    },
+  };
+}
+
 
 function getUserTextFromMessages(messages: ChatMessage[]) {
   return messages
@@ -180,8 +364,15 @@ function buildMatchmakingRuntimeGuidance({
   canUseTools: boolean;
   forceGenerateProfiles?: boolean;
 }) {
+  const persistentUserProfile = buildPersistentUserProfile(uiMessages);
+  const profileMemoryGuidance = `\n\nPersistent user profile memory (source of truth; keep this updated in your reasoning and do not discard known fields on regeneration):\n${JSON.stringify(
+    persistentUserProfile,
+    null,
+    2,
+  )}\n\nRules for this memory:\n- Reuse known preferences from this object on every response.\n- Do not re-ask for fields that are already known unless the user asks to change them.\n- During regeneration, preserve known constraints and only adjust fields based on new feedback.\n- If new user input conflicts with existing values, prefer the newest explicit user statement and update the object.`;
+
   if (forceGenerateProfiles) {
-    return `\n\nRuntime conversation guidance:\n- The user just submitted their intake form. You now have their full preferences.\n- The generateProfiles tool is NOT available yet — you must complete Step 1 first.\n- Send your confirmation summary now: briefly restate what you heard, list the exact criteria, and ask "Does this look right? I'll find your matches once you give me the go-ahead."\n- Do NOT output JSON. Do NOT attempt to call any tool. Just send the confirmation message.`;
+    return `\n\nRuntime conversation guidance:\n- The user just submitted their intake form. You now have their full preferences.\n- The generateProfiles tool is NOT available yet — you must complete Step 1 first.\n- Send your confirmation summary now: briefly restate what you heard, list the exact criteria, and ask "Does this look right? I'll find your matches once you give me the go-ahead."\n- Do NOT output JSON. Do NOT attempt to call any tool. Just send the confirmation message.${profileMemoryGuidance}`;
   }
 
   const userTexts = getUserTextFromMessages(uiMessages);
@@ -226,11 +417,11 @@ function buildMatchmakingRuntimeGuidance({
     );
 
   if (profilesSuccessfullyGenerated) {
-    return "";
+    return profileMemoryGuidance;
   }
 
   if (lastGenerationFailed) {
-    return `\n\nRuntime conversation guidance:\n- The last profile generation attempt failed and returned no profiles.\n- Do NOT describe profiles as text in the chat — only the generateProfiles tool can display them.\n- Return to Step 1: send a fresh preferences confirmation message listing all criteria, then ask "Does this look right? I'll find your matches once you give me the go-ahead."\n- Wait for the user to affirm before trying to generate again.`;
+    return `\n\nRuntime conversation guidance:\n- The last profile generation attempt failed and returned no profiles.\n- Do NOT describe profiles as text in the chat — only the generateProfiles tool can display them.\n- Return to Step 1: send a fresh preferences confirmation message listing all criteria, then ask "Does this look right? I'll find your matches once you give me the go-ahead."\n- Wait for the user to affirm before trying to generate again.${profileMemoryGuidance}`;
   }
 
   const hasEnoughContext =
@@ -238,14 +429,14 @@ function buildMatchmakingRuntimeGuidance({
     (asksForMatches || hasTraitsOrValues || userTexts.length >= 4);
 
   if (!canUseTools && hasEnoughContext) {
-    return `\n\nRuntime conversation guidance:\n- Do not repeat opening questions.\n- The user has already provided enough direction to continue.\n- Briefly acknowledge their preferences and ask ONE new, non-redundant question that adds missing details.`;
+    return `\n\nRuntime conversation guidance:\n- Do not repeat opening questions.\n- The user has already provided enough direction to continue.\n- Briefly acknowledge their preferences and ask ONE new, non-redundant question that adds missing details.${profileMemoryGuidance}`;
   }
 
   if (!hasEnoughContext) {
-    return "";
+    return profileMemoryGuidance;
   }
 
-  return `\n\nRuntime conversation guidance:\n- The user has already shared relationship intent and meaningful preferences.\n- Do NOT ask again what kind of connection they are looking for.\n- Follow the Profile Generation Flow: present your summary + criteria confirmation (Step 1), then generate profiles only after the user gives the go-ahead (Step 2).`;
+  return `\n\nRuntime conversation guidance:\n- The user has already shared relationship intent and meaningful preferences.\n- Do NOT ask again what kind of connection they are looking for.\n- Follow the Profile Generation Flow: present your summary + criteria confirmation (Step 1), then generate profiles only after the user gives the go-ahead (Step 2).${profileMemoryGuidance}`;
 }
 
 export async function POST(request: Request) {

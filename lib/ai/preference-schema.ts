@@ -34,7 +34,7 @@ export interface PreferenceState {
   // Lifestyle & values
   religionPreference?: string;
   smokingPreference?: "dealbreaker" | "ok" | "prefer_non_smoker";
-  drinkingPreference?: "dealbreaker" | "ok" | "social_ok";
+  drinkingPreference?: "dealbreaker" | "ok" | "social_ok" | "no_drinking";
   educationPreference?: string;
   politicalViewsPreference?: string;
 

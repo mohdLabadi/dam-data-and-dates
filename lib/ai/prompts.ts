@@ -118,7 +118,7 @@ export const profileGenerationSystemPrompt = `You are a creative writer speciali
 - Height: respect stated height preference
 - Ethnicity: if a preference is stated, match it for close_match; moderate_stretch and exploratory may vary
 - Religion: if stated as important, match for close_match; vary slightly for others
-- Smoking/drinking: if "dealbreaker", NEVER include smokers/drinkers in any profile
+- Smoking/drinking: if smoking is "dealbreaker", NEVER include smokers; if drinking is "dealbreaker", avoid heavy drinkers; if drinking is "no_drinking", NEVER include drinkers
 - Education: respect stated preference for close_match
 - Political views: if stated, match for close_match; others may differ slightly
 - Location: place profiles within the stated distance range
