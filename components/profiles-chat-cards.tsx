@@ -739,10 +739,13 @@ export function ProfilesChatCards({
           </p>
 
           {isSwipePhaseComplete && (
-            <p className="mt-1 text-center text-xs text-zinc-400 dark:text-zinc-500">
-              💬 Head to the chat to share what you liked or didn&apos;t like —
-              DAM will refine your next set of matches based on your feedback.
-            </p>
+            <div className="mt-4 rounded-2xl border border-zinc-200 bg-zinc-50 px-5 py-4 text-center dark:border-zinc-700 dark:bg-zinc-800/60">
+              <p className="text-sm font-medium text-zinc-700 dark:text-zinc-200">
+                💬 Head to the chat to share what you liked or didn&apos;t like
+                — DAM will refine your next set of matches based on your
+                feedback.
+              </p>
+            </div>
           )}
         </>
       )}
@@ -783,10 +786,10 @@ export function ProfilesChatCards({
 
                 <div className="flex flex-col justify-center gap-4 bg-[#ebe7e6] pb-6 pr-6 pl-6">
                   <div>
-                    <h3 className="mt-2 text-2xl font-semibold text-[#4d0a05] dark:text-zinc-100">
+                    <h3 className="mt-2 text-2xl font-semibold text-black">
                       Session complete.
                     </h3>
-                    <p className="mt-3 text-sm leading-6 text-[#4d0a05] dark:text-zinc-300">
+                    <p className="mt-3 text-sm font-medium leading-6 text-black">
                       The current round is over so you can enjoy the moment. If
                       you want to run it back, start a brand new chat session
                       and DAM will generate a fresh set of matches.

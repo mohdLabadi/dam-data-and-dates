@@ -38,6 +38,7 @@ export function useScrollToBottom() {
     }
 
     let scrollTimeout: ReturnType<typeof setTimeout>;
+    let clickTimeout: ReturnType<typeof setTimeout>;
 
     const handleScroll = () => {
       // Mark as user scrolling
@@ -55,10 +56,23 @@ export function useScrollToBottom() {
       }, 150);
     };
 
+    const handlePointerDown = () => {
+      // Suppress auto-scroll briefly after any click so interactive
+      // elements (e.g. swipe buttons) don't trigger a scroll-to-bottom
+      isUserScrollingRef.current = true;
+      clearTimeout(clickTimeout);
+      clickTimeout = setTimeout(() => {
+        isUserScrollingRef.current = false;
+      }, 300);
+    };
+
     container.addEventListener("scroll", handleScroll, { passive: true });
+    container.addEventListener("pointerdown", handlePointerDown, { passive: true });
     return () => {
       container.removeEventListener("scroll", handleScroll);
+      container.removeEventListener("pointerdown", handlePointerDown);
       clearTimeout(scrollTimeout);
+      clearTimeout(clickTimeout);
     };
   }, [checkIfAtBottom]);
 

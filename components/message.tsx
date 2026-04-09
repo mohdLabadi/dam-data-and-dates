@@ -84,8 +84,22 @@ const PurePreviewMessage = ({
         })}
       >
         {message.role === "assistant" && (
-          <div className="-mt-1 flex size-8 shrink-0 items-center justify-center rounded-full bg-background ring-1 ring-border">
-            <SparklesIcon size={14} />
+          <div className="-mt-1 flex shrink-0 items-center gap-2">
+            <div className="flex size-8 items-center justify-center rounded-full bg-background ring-1 ring-border">
+              <div className={isLoading && !hasVisibleAssistantContent ? "animate-pulse" : undefined}>
+                <SparklesIcon size={14} />
+              </div>
+            </div>
+            {isLoading && !hasVisibleAssistantContent && (
+              <div className="flex items-center gap-1 text-sm text-muted-foreground">
+                <span className="animate-pulse">Thinking</span>
+                <span className="inline-flex">
+                  <span className="animate-bounce [animation-delay:0ms]">.</span>
+                  <span className="animate-bounce [animation-delay:150ms]">.</span>
+                  <span className="animate-bounce [animation-delay:300ms]">.</span>
+                </span>
+              </div>
+            )}
           </div>
         )}
 
