@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { memo } from "react";
 import { useSession, signOut } from "next-auth/react";
 import Link from "next/link";
+import { clearSessionLocalStorage } from "@/lib/session-storage";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -56,6 +57,7 @@ function PureChatHeader({
               <Button
                 className="h-8 px-2 md:h-fit md:px-2"
                 onClick={() => {
+                  clearSessionLocalStorage();
                   router.push("/");
                   router.refresh();
                 }}

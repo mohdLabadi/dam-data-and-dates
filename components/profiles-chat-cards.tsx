@@ -2,9 +2,14 @@
 
 import type { UseChatHelpers } from "@ai-sdk/react";
 import Image from "next/image";
+import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import type { PartnerProfile, ProfileSet } from "@/lib/ai/preference-schema";
+import {
+  clearSessionLocalStorage,
+  SAVED_MATCHES_STORAGE_KEY,
+} from "@/lib/session-storage";
 import type { ChatMessage } from "@/lib/types";
 import { generateUUID } from "@/lib/utils";
 
@@ -18,8 +23,6 @@ type SavedMatchRecord = {
   profileId: string;
   profile: PartnerProfile;
 };
-
-const SAVED_MATCHES_STORAGE_KEY = "dam-saved-matches";
 
 function readSavedMatchesFromLocalStorage() {
   if (typeof window === "undefined") {
@@ -72,6 +75,7 @@ export function ProfileCard({
   profile,
   onSave,
   onRemove,
+  onChooseMatch,
   isSaved,
   isSaving,
   isRemoving,
@@ -80,6 +84,7 @@ export function ProfileCard({
   profile: PartnerProfile;
   onSave?: (profile: PartnerProfile) => void;
   onRemove?: () => void;
+  onChooseMatch?: (profile: PartnerProfile) => void;
   isSaved?: boolean;
   isSaving?: boolean;
   isRemoving?: boolean;
@@ -219,7 +224,17 @@ export function ProfileCard({
             ))}
           </div>
 
-          <div className="flex justify-end border-zinc-100 pt-1 md:border-t dark:border-zinc-800">
+          <div className="flex flex-wrap justify-end gap-2 border-zinc-100 pt-1 md:border-t dark:border-zinc-800">
+            {onChooseMatch ? (
+              <button
+                className="flex items-center gap-1.5 rounded-full border border-emerald-300 bg-emerald-50 px-4 py-1.5 text-sm font-semibold text-emerald-800 transition-colors hover:border-emerald-400 hover:bg-emerald-100 dark:border-emerald-900/70 dark:bg-emerald-950/40 dark:text-emerald-300 dark:hover:bg-emerald-950/60"
+                onClick={() => onChooseMatch(profile)}
+                type="button"
+              >
+                This is the one for me
+              </button>
+            ) : null}
+
             {onRemove ? (
               <button
                 className="flex items-center gap-1.5 rounded-full border border-zinc-200 bg-white px-4 py-1.5 text-sm font-medium text-zinc-700 transition-colors hover:border-zinc-400 hover:bg-zinc-100 disabled:cursor-not-allowed disabled:opacity-60 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:border-zinc-500 dark:hover:bg-zinc-700"
@@ -246,6 +261,7 @@ export function ProfilesChatCards({
   documentId?: string;
   sendMessage?: UseChatHelpers<ChatMessage>["sendMessage"];
 }) {
+  const router = useRouter();
   const [savedMatches, setSavedMatches] = useState<SavedMatchRecord[]>([]);
   const [savingProfileId, setSavingProfileId] = useState<string | null>(null);
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -257,7 +273,24 @@ export function ProfilesChatCards({
   >({});
   const [hasSubmittedSwipeSummary, setHasSubmittedSwipeSummary] =
     useState(false);
+  const [matchedProfile, setMatchedProfile] = useState<PartnerProfile | null>(
+    null,
+  );
   const activePointerIdRef = useRef<number | null>(null);
+  const confettiPieces = useMemo(
+    () =>
+      Array.from({ length: 26 }, (_, index) => ({
+        id: index,
+        left: `${(index * 17) % 100}%`,
+        delay: `${(index % 6) * 0.14}s`,
+        duration: `${2.8 + (index % 5) * 0.35}s`,
+        color: ["#f97316", "#22c55e", "#ef4444", "#eab308", "#0ea5e9"][
+          index % 5
+        ],
+        rotate: `${(index % 7) * 18}deg`,
+      })),
+    [],
+  );
 
   const profileIdsSignature = useMemo(
     () => profileSet.profiles.map((profile) => profile.id).join("|"),
@@ -322,8 +355,22 @@ export function ProfilesChatCards({
     setSwipeStartX(null);
     setSwipeOffsetX(0);
     setIsSwipeDragging(false);
+    setMatchedProfile(null);
     setCurrentIndex(0);
   }, [profileIdsSignature]);
+
+  useEffect(() => {
+    if (!matchedProfile) {
+      return;
+    }
+
+    const originalOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+
+    return () => {
+      document.body.style.overflow = originalOverflow;
+    };
+  }, [matchedProfile]);
 
   const handleSaveMatch = async (profile: PartnerProfile) => {
     if (!documentId) {
@@ -430,6 +477,10 @@ export function ProfilesChatCards({
   };
 
   const registerSwipeDecision = (decision: SwipeDecision) => {
+    if (matchedProfile) {
+      return;
+    }
+
     const activeProfile = profileSet.profiles[currentIndex];
 
     if (!activeProfile) {
@@ -460,6 +511,16 @@ export function ProfilesChatCards({
     submitSwipeSummary(nextDecisions);
   };
 
+  const handleChooseMatch = async (profile: PartnerProfile) => {
+    if (!savedProfileKeys.has(`${documentId}:${profile.id}`)) {
+      await handleSaveMatch(profile);
+    }
+
+    clearSessionLocalStorage();
+    setSavedMatches([]);
+    setMatchedProfile(profile);
+  };
+
   const resetSwipe = () => {
     setSwipeStartX(null);
     setSwipeOffsetX(0);
@@ -467,7 +528,7 @@ export function ProfilesChatCards({
   };
 
   const handleSwipeStart = (x: number) => {
-    if (isSwipePhaseComplete) {
+    if (isSwipePhaseComplete || matchedProfile) {
       return;
     }
 
@@ -543,33 +604,32 @@ export function ProfilesChatCards({
             <span>
               Match {currentIndex + 1} of {profileSet.profiles.length}
             </span>
-            <div className="flex items-center gap-2">
-              <button
-                className="rounded-full border border-zinc-200 px-2.5 py-1 hover:bg-zinc-100 disabled:opacity-50 dark:border-zinc-700 dark:hover:bg-zinc-800"
-                disabled={currentIndex === 0 || !isSwipePhaseComplete}
-                onClick={() =>
-                  setCurrentIndex((index) => Math.max(0, index - 1))
-                }
-                type="button"
-              >
-                Prev
-              </button>
-              <button
-                className="rounded-full border border-zinc-200 px-2.5 py-1 hover:bg-zinc-100 disabled:opacity-50 dark:border-zinc-700 dark:hover:bg-zinc-800"
-                disabled={
-                  currentIndex >= profileSet.profiles.length - 1 ||
-                  !isSwipePhaseComplete
-                }
-                onClick={() =>
-                  setCurrentIndex((index) =>
-                    Math.min(profileSet.profiles.length - 1, index + 1),
-                  )
-                }
-                type="button"
-              >
-                Next
-              </button>
-            </div>
+            {isSwipePhaseComplete && (
+              <div className="flex items-center gap-2">
+                <button
+                  className="rounded-full border border-zinc-200 px-2.5 py-1 hover:bg-zinc-100 disabled:opacity-50 dark:border-zinc-700 dark:hover:bg-zinc-800"
+                  disabled={currentIndex === 0}
+                  onClick={() =>
+                    setCurrentIndex((index) => Math.max(0, index - 1))
+                  }
+                  type="button"
+                >
+                  Prev
+                </button>
+                <button
+                  className="rounded-full border border-zinc-200 px-2.5 py-1 hover:bg-zinc-100 disabled:opacity-50 dark:border-zinc-700 dark:hover:bg-zinc-800"
+                  disabled={currentIndex >= profileSet.profiles.length - 1}
+                  onClick={() =>
+                    setCurrentIndex((index) =>
+                      Math.min(profileSet.profiles.length - 1, index + 1),
+                    )
+                  }
+                  type="button"
+                >
+                  Next
+                </button>
+              </div>
+            )}
           </div>
 
           <div
@@ -622,6 +682,7 @@ export function ProfilesChatCards({
                   savingProfileId === profileSet.profiles[currentIndex].id
                 }
                 key={profileSet.profiles[currentIndex].id}
+                onChooseMatch={handleChooseMatch}
                 onSave={isSwipePhaseComplete ? handleSaveMatch : undefined}
                 profile={profileSet.profiles[currentIndex]}
               />
@@ -684,6 +745,82 @@ export function ProfilesChatCards({
             </p>
           )}
         </>
+      )}
+
+      {matchedProfile && (
+        <div className="fixed inset-0 z-50 overflow-hidden bg-black/75 px-4 py-6 backdrop-blur-sm">
+          <div className="absolute inset-0 pointer-events-none overflow-hidden">
+            {confettiPieces.map((piece) => (
+              <span
+                className="absolute top-[-10%] h-4 w-2 rounded-full opacity-90"
+                key={piece.id}
+                style={{
+                  left: piece.left,
+                  backgroundColor: piece.color,
+                  transform: `rotate(${piece.rotate})`,
+                  animation: `confetti-fall ${piece.duration} linear ${piece.delay} infinite`,
+                }}
+              />
+            ))}
+          </div>
+
+          <div className="relative z-10 mx-auto flex min-h-full max-w-6xl items-center justify-center">
+            <div className="w-full overflow-hidden rounded-[2rem] border border-[#c3b8b5] bg-white shadow-2xl dark:bg-zinc-950">
+              <div className="bg-[#e6e1df] px-6 py-8 text-white md:px-8">
+                <p className="text-sm font-semibold uppercase tracking-[0.3em] text-[#4d0a05]">
+                  Match Locked In
+                </p>
+                <p className="mt-3 max-w-2xl text-sm md:text-base text-[#4d0a05]">
+                  You picked {matchedProfile.name}, and DAM is officially
+                  calling it: yay, you matched.
+                </p>
+              </div>
+
+              <div className="bg-[#ebe7e6]">
+                <div className="pt-6">
+                  <ProfileCard profile={matchedProfile} />
+                </div>
+
+                <div className="flex flex-col justify-center gap-4 bg-[#ebe7e6] pb-6 pr-6 pl-6">
+                  <div>
+                    <h3 className="mt-2 text-2xl font-semibold text-[#4d0a05] dark:text-zinc-100">
+                      Session complete.
+                    </h3>
+                    <p className="mt-3 text-sm leading-6 text-[#4d0a05] dark:text-zinc-300">
+                      The current round is over so you can enjoy the moment. If
+                      you want to run it back, start a brand new chat session
+                      and DAM will generate a fresh set of matches.
+                    </p>
+                  </div>
+
+                  <button
+                    className="inline-flex items-center justify-center rounded-full bg-[#4d0a05] px-5 py-3 text-sm font-semibold text-[#ebe7e6] transition-colors hover:bg-zinc-700 dark:bg-white dark:text-zinc-900 dark:hover:bg-zinc-200"
+                    onClick={() => {
+                      clearSessionLocalStorage();
+                      router.push("/");
+                      router.refresh();
+                    }}
+                    type="button"
+                  >
+                    Start a new chat session
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <style jsx>{`
+            @keyframes confetti-fall {
+              0% {
+                transform: translate3d(0, -12vh, 0) rotate(0deg);
+              }
+
+              100% {
+                transform: translate3d(0, 115vh, 0) rotate(540deg);
+              }
+            }
+          `}</style>
+        </div>
       )}
     </div>
   );
