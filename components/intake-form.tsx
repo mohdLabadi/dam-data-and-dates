@@ -48,11 +48,11 @@ const initialValues: IntakeValues = {
   preferredAgeMax: "",
   location: "",
   maxDistanceMiles: "",
-  religionPreference: "open",
+  religionPreference: "",
   relationshipGoal: "",
   interestedIn: "",
-  smokingPreference: "prefer_non_smoker",
-  drinkingPreference: "social_ok",
+  smokingPreference: "",
+  drinkingPreference: "",
   hobbies: [],
   partnerQualities: [],
   values: [],
@@ -115,6 +115,8 @@ const labelByValue = (
 ) => {
   return options.find((option) => option.value === value)?.label ?? value;
 };
+
+const examplePlaceholderClassName = "placeholder:text-muted-foreground/50";
 
 function buildIntakePrompt(values: IntakeValues) {
   const lines = [
@@ -199,6 +201,7 @@ function TagInput({
         </div>
 
         <Input
+          className={examplePlaceholderClassName}
           id={id}
           onBlur={commitBuffer}
           onChange={(event) => {
@@ -406,6 +409,7 @@ export function IntakeForm({
             <div className="flex flex-col gap-2">
               <Label htmlFor="firstName">First name *</Label>
               <Input
+                className={examplePlaceholderClassName}
                 id="firstName"
                 inputMode="text"
                 maxLength={80}
@@ -415,7 +419,7 @@ export function IntakeForm({
                     firstName: event.target.value.replace(/[^a-zA-Z\s'-]/g, ""),
                   }))
                 }
-                placeholder="Alex"
+                placeholder="Ex: Alex"
                 required
                 value={values.firstName}
               />
@@ -424,6 +428,7 @@ export function IntakeForm({
             <div className="flex flex-col gap-2">
               <Label htmlFor="age">Your age *</Label>
               <Input
+                className={examplePlaceholderClassName}
                 id="age"
                 inputMode="numeric"
                 max={99}
@@ -434,7 +439,7 @@ export function IntakeForm({
                     age: event.target.value.replace(/\D/g, "").slice(0, 2),
                   }))
                 }
-                placeholder="29"
+                placeholder="Ex: 29"
                 required
                 type="number"
                 value={values.age}
@@ -445,6 +450,7 @@ export function IntakeForm({
               <div className="flex flex-col gap-2">
                 <Label htmlFor="preferredAgeMin">Preferred age min *</Label>
                 <Input
+                  className={examplePlaceholderClassName}
                   id="preferredAgeMin"
                   inputMode="numeric"
                   max={99}
@@ -457,7 +463,7 @@ export function IntakeForm({
                         .slice(0, 2),
                     }))
                   }
-                  placeholder="27"
+                  placeholder="Ex: 27"
                   required
                   type="number"
                   value={values.preferredAgeMin}
@@ -467,6 +473,7 @@ export function IntakeForm({
               <div className="flex flex-col gap-2">
                 <Label htmlFor="preferredAgeMax">Preferred age max *</Label>
                 <Input
+                  className={examplePlaceholderClassName}
                   id="preferredAgeMax"
                   inputMode="numeric"
                   max={99}
@@ -479,7 +486,7 @@ export function IntakeForm({
                         .slice(0, 2),
                     }))
                   }
-                  placeholder="36"
+                  placeholder="Ex: 36"
                   required
                   type="number"
                   value={values.preferredAgeMax}
@@ -490,6 +497,7 @@ export function IntakeForm({
             <div className="flex flex-col gap-2 md:col-span-2">
               <Label htmlFor="location">City/area</Label>
               <Input
+                className={examplePlaceholderClassName}
                 id="location"
                 maxLength={120}
                 onChange={(event) =>
@@ -498,7 +506,7 @@ export function IntakeForm({
                     location: event.target.value,
                   }))
                 }
-                placeholder="Brooklyn, NY"
+                placeholder="Ex: Brooklyn, NY"
                 value={values.location}
               />
             </div>
@@ -506,6 +514,7 @@ export function IntakeForm({
             <div className="flex flex-col gap-2">
               <Label htmlFor="maxDistanceMiles">Maximum distance (miles)</Label>
               <Input
+                className={examplePlaceholderClassName}
                 id="maxDistanceMiles"
                 inputMode="numeric"
                 max={500}
@@ -518,7 +527,7 @@ export function IntakeForm({
                       .slice(0, 3),
                   }))
                 }
-                placeholder="25"
+                placeholder="Ex: 25"
                 type="number"
                 value={values.maxDistanceMiles}
               />
@@ -575,7 +584,7 @@ export function IntakeForm({
                 value={values.religionPreference}
               >
                 <SelectTrigger>
-                  <SelectValue />
+                  <SelectValue placeholder="Choose one" />
                 </SelectTrigger>
                 <SelectContent>
                   {religionOptions.map((option) => (
@@ -596,7 +605,7 @@ export function IntakeForm({
                 value={values.smokingPreference}
               >
                 <SelectTrigger>
-                  <SelectValue />
+                  <SelectValue placeholder="Choose one" />
                 </SelectTrigger>
                 <SelectContent>
                   {smokingOptions.map((option) => (
@@ -617,7 +626,7 @@ export function IntakeForm({
                 value={values.drinkingPreference}
               >
                 <SelectTrigger>
-                  <SelectValue />
+                  <SelectValue placeholder="Choose one" />
                 </SelectTrigger>
                 <SelectContent>
                   {drinkingOptions.map((option) => (
@@ -636,7 +645,7 @@ export function IntakeForm({
                 onChange={(next) =>
                   setValues((prev) => ({ ...prev, hobbies: next }))
                 }
-                placeholder="Add one hobby at a time"
+                placeholder="Ex: hiking"
                 tags={values.hobbies}
               />
             </div>
@@ -649,7 +658,7 @@ export function IntakeForm({
                 onChange={(next) =>
                   setValues((prev) => ({ ...prev, partnerQualities: next }))
                 }
-                placeholder="Kind, emotionally available, ambitious"
+                placeholder="Ex: kind, emotionally available, ambitious"
                 tags={values.partnerQualities}
               />
             </div>
@@ -662,7 +671,7 @@ export function IntakeForm({
                 onChange={(next) =>
                   setValues((prev) => ({ ...prev, values: next }))
                 }
-                placeholder="Family-oriented, growth mindset"
+                placeholder="Ex: family-oriented, growth mindset"
                 tags={values.values}
               />
             </div>
@@ -674,7 +683,7 @@ export function IntakeForm({
                 onChange={(next) =>
                   setValues((prev) => ({ ...prev, dealbreakers: next }))
                 }
-                placeholder="Dishonesty, smoking, poor communication"
+                placeholder="Ex: dishonesty, smoking, poor communication"
                 tags={values.dealbreakers}
               />
             </div>
@@ -682,6 +691,7 @@ export function IntakeForm({
             <div className="flex flex-col gap-2 md:col-span-2">
               <Label htmlFor="lifestyle">Lifestyle notes</Label>
               <Textarea
+                className={examplePlaceholderClassName}
                 id="lifestyle"
                 maxLength={240}
                 onChange={(event) =>
@@ -690,7 +700,7 @@ export function IntakeForm({
                     lifestyle: event.target.value,
                   }))
                 }
-                placeholder="Any context about your lifestyle or dating preferences"
+                placeholder="Ex: I work nights, love quiet weekends, and want something intentional"
                 rows={3}
                 value={values.lifestyle}
               />

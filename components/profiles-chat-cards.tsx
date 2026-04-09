@@ -47,7 +47,10 @@ function writeSavedMatchesToLocalStorage(matches: SavedMatchRecord[]) {
   }
 
   try {
-    window.localStorage.setItem(SAVED_MATCHES_STORAGE_KEY, JSON.stringify(matches));
+    window.localStorage.setItem(
+      SAVED_MATCHES_STORAGE_KEY,
+      JSON.stringify(matches),
+    );
   } catch {
     // Quota exceeded — retry without photo data
     try {
@@ -55,7 +58,10 @@ function writeSavedMatchesToLocalStorage(matches: SavedMatchRecord[]) {
         ...m,
         profile: { ...m.profile, profilePhotoDataUrl: undefined },
       }));
-      window.localStorage.setItem(SAVED_MATCHES_STORAGE_KEY, JSON.stringify(stripped));
+      window.localStorage.setItem(
+        SAVED_MATCHES_STORAGE_KEY,
+        JSON.stringify(stripped),
+      );
     } catch {
       // Still too large — skip local persistence; server is the source of truth
     }
@@ -635,15 +641,46 @@ export function ProfilesChatCards({
             </div>
           </div>
 
+          {!isSwipePhaseComplete && (
+            <div className="-mt-1 mb-3 flex items-center justify-center gap-3">
+              <button
+                aria-label="Pass on this match"
+                className="inline-flex h-11 min-w-11 items-center justify-center rounded-full border border-red-200 bg-red-50 px-4 text-sm font-semibold text-red-700 transition-colors hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-50 dark:border-red-900/70 dark:bg-red-950/40 dark:text-red-300 dark:hover:bg-red-950/60"
+                disabled={Boolean(activeProfileDecision)}
+                onClick={() => registerSwipeDecision("pass")}
+                type="button"
+              >
+                <span aria-hidden="true" className="text-lg leading-none">
+                  ←
+                </span>
+                <span className="ml-2">Pass</span>
+              </button>
+
+              <button
+                aria-label="Like this match"
+                className="inline-flex h-11 min-w-11 items-center justify-center rounded-full border border-green-200 bg-green-50 px-4 text-sm font-semibold text-green-700 transition-colors hover:bg-green-100 disabled:cursor-not-allowed disabled:opacity-50 dark:border-green-900/70 dark:bg-green-950/40 dark:text-green-300 dark:hover:bg-green-950/60"
+                disabled={Boolean(activeProfileDecision)}
+                onClick={() => registerSwipeDecision("like")}
+                type="button"
+              >
+                <span className="mr-2">Like</span>
+                <span aria-hidden="true" className="text-lg leading-none">
+                  →
+                </span>
+              </button>
+            </div>
+          )}
+
           <p className="-mt-2 mb-2 text-center text-xs text-zinc-500 dark:text-zinc-400">
             {isSwipePhaseComplete
               ? "Swiping complete. Use Prev/Next to review all matches."
-              : `Swipe left to pass, swipe right to like & save. (${swipedCount}/${profileSet.profiles.length} done${activeProfileDecision ? `, current: ${activeProfileDecision}` : ""})`}
+              : `Swipe left to pass, swipe right to like & save, or use the arrow buttons. (${swipedCount}/${profileSet.profiles.length} done${activeProfileDecision ? `, current: ${activeProfileDecision}` : ""})`}
           </p>
 
           {isSwipePhaseComplete && (
             <p className="mt-1 text-center text-xs text-zinc-400 dark:text-zinc-500">
-              💬 Head to the chat to share what you liked or didn&apos;t like — DAM will refine your next set of matches based on your feedback.
+              💬 Head to the chat to share what you liked or didn&apos;t like —
+              DAM will refine your next set of matches based on your feedback.
             </p>
           )}
         </>
