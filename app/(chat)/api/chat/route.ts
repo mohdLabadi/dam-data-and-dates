@@ -16,6 +16,7 @@ import { resolveChatModelId } from "@/lib/ai/models";
 import { type RequestHints, systemPrompt } from "@/lib/ai/prompts";
 import { getLanguageModel } from "@/lib/ai/providers";
 import { createDocument } from "@/lib/ai/tools/create-document";
+import { detectNegativeSelfPerception } from "@/lib/ai/content-guardrails";
 import { generateProfiles } from "@/lib/ai/tools/generate-profiles";
 import { getWeather } from "@/lib/ai/tools/get-weather";
 import { requestSuggestions } from "@/lib/ai/tools/request-suggestions";
@@ -582,6 +583,8 @@ export async function POST(request: Request) {
     const userAffirmed = /\b(yes|yeah|yep|yup|ok|okay|sure|go ahead|generate|looks good|looks right|that'?s? right|correct|right|perfect|great|sounds good|do it|proceed|let'?s? go|confirmed?)\b/.test(latestUserText);
     const canGenerateProfiles = modelMessages.length >= 3 && botJustAskedForConfirmation && userAffirmed;
 
+    const negativeFramingDetected = detectNegativeSelfPerception(latestUserText);
+
     const activeTools: ActiveToolName[] = isReasoningModel
       ? []
       : canGenerateProfiles ? ["generateProfiles"] : [];
@@ -599,7 +602,7 @@ export async function POST(request: Request) {
         const result = streamText({
           model: getLanguageModel(resolvedChatModel),
           maxRetries: 0,
-          system: `${systemPrompt({ selectedChatModel: resolvedChatModel, requestHints })}${runtimeGuidance}`,
+          system: `${systemPrompt({ selectedChatModel: resolvedChatModel, requestHints })}${runtimeGuidance}${negativeFramingDetected ? "\n\nSAFETY OVERRIDE — act on this immediately: The user's latest message contains negative self-framing (e.g. expressing that they are unattractive, undesirable, or asking why no one would want them). Do NOT engage with, validate, or build on that framing. Do NOT call any tools. Respond with warmth and empathy: briefly acknowledge their feeling, firmly and kindly affirm that you are here to help them find a genuine connection, and redirect the conversation toward what they are looking for in a partner." : ""}`,
           messages: modelMessages,
           stopWhen: (opts) => stepCountIs(maxStepCount)(opts) || hasToolCall('generateProfiles')(opts),
           experimental_activeTools: activeTools,

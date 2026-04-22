@@ -1,6 +1,7 @@
 import { generateText, tool } from "ai";
 import type { Session } from "next-auth";
 import { z } from "zod";
+import { sanitizeCompatibilityText } from "@/lib/ai/content-guardrails";
 import {
   buildProfileGenerationPrompt,
   profileGenerationSystemPrompt,
@@ -199,10 +200,22 @@ export const generateProfiles = ({
               })
             );
 
+            const sanitizedProfiles = enrichedProfiles.map((profile) => ({
+              ...profile,
+              compatibilityNotes: sanitizeCompatibilityText(
+                profile.compatibilityNotes ?? "",
+                "This pairing brings together complementary values and genuine potential for connection."
+              ),
+              challengePoint: sanitizeCompatibilityText(
+                profile.challengePoint ?? "",
+                "They bring a different perspective that could lead to interesting conversations and growth."
+              ),
+            }));
+
             profilesJson = JSON.stringify(
               {
                 ...parsed,
-                profiles: enrichedProfiles,
+                profiles: sanitizedProfiles,
               },
               null,
               2

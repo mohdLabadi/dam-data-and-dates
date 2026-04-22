@@ -334,6 +334,7 @@ const PurePreviewMessage = ({
                     profileSet?: {
                       profiles?: PartnerProfile[];
                       preferencesSummary?: string;
+                      generatedAt?: string;
                     };
                     profiles?: PartnerProfile[];
                     preferencesSummary?: string;
@@ -366,7 +367,7 @@ const PurePreviewMessage = ({
                   <ProfilesChatCards
                     documentId={rawOutput?.documentId}
                     profileSet={{
-                      generatedAt: new Date().toISOString(),
+                      generatedAt: rawOutput?.profileSet?.generatedAt ?? "",
                       preferencesSummary: profileSet.preferencesSummary ?? "",
                       profiles: profileSet.profiles,
                     }}
