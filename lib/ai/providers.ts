@@ -58,6 +58,13 @@ export function getArtifactModel() {
   throw new Error("Missing AI provider credentials. Set GOOGLE_GENERATIVE_AI_API_KEY.");
 }
 
+export function getClassifierModel() {
+  if (google) {
+    return google(DEFAULT_DIRECT_GOOGLE_MODEL);
+  }
+  throw new Error("Missing AI provider credentials. Set GOOGLE_GENERATIVE_AI_API_KEY.");
+}
+
 export function getProfilePhotoImageModel(): ImageModel | null {
   const modelId =
     process.env.NANO_BANANA_IMAGE_MODEL ?? DEFAULT_NANO_BANANA_IMAGE_MODEL;
