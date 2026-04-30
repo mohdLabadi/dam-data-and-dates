@@ -5,6 +5,7 @@ import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
+import { coarseLocation } from "@/lib/ai/content-guardrails";
 import type { PartnerProfile, ProfileSet } from "@/lib/ai/preference-schema";
 import {
   clearSessionLocalStorage,
@@ -23,6 +24,9 @@ type SavedMatchRecord = {
   profileId: string;
   profile: PartnerProfile;
 };
+
+const MAX_PROFILE_OPEN_EVENTS = 24;
+const MAX_REPEAT_VIEWS_PER_PROFILE = 7;
 
 function readSavedMatchesFromLocalStorage() {
   if (typeof window === "undefined") {
@@ -80,6 +84,7 @@ export function ProfileCard({
   isSaving,
   isRemoving,
   saveLocked,
+  hideSensitiveDetails,
 }: {
   profile: PartnerProfile;
   onSave?: (profile: PartnerProfile) => void;
@@ -89,6 +94,7 @@ export function ProfileCard({
   isSaving?: boolean;
   isRemoving?: boolean;
   saveLocked?: boolean;
+  hideSensitiveDetails?: boolean;
 }) {
   const initials = profile.name
     .split(" ")
@@ -138,7 +144,7 @@ export function ProfileCard({
               ) : null}
             </div>
             <p className="mt-1 text-xs text-white/90 sm:text-sm">
-              {profile.location} · {profile.occupation}
+              {coarseLocation(profile.location)} · {profile.occupation}
             </p>
             {profile.height ? (
               <p className="mt-1 text-xs uppercase tracking-wide text-white/70">
@@ -172,7 +178,7 @@ export function ProfileCard({
               ) : null}
             </div>
             <p className="mt-1 text-xs text-zinc-500 sm:text-sm dark:text-zinc-400">
-              {profile.location} · {profile.occupation}
+              {coarseLocation(profile.location)} · {profile.occupation}
             </p>
             {profile.height ? (
               <p className="mt-1 text-xs uppercase tracking-wide text-zinc-400 dark:text-zinc-500">
@@ -181,36 +187,39 @@ export function ProfileCard({
             ) : null}
           </div>
 
-          {(profile.ethnicity ||
-            profile.religion ||
-            profile.education ||
-            profile.politicalViews) && (
-            <div className="flex flex-wrap gap-1.5 text-xs">
-              {profile.ethnicity && (
-                <span className="rounded-full bg-zinc-100 px-2 py-0.5 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-300">
-                  {profile.ethnicity}
-                </span>
-              )}
-              {profile.religion && (
-                <span className="rounded-full bg-zinc-100 px-2 py-0.5 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-300">
-                  {profile.religion}
-                </span>
-              )}
-              {profile.education && (
-                <span className="rounded-full bg-zinc-100 px-2 py-0.5 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-300">
-                  {profile.education}
-                </span>
-              )}
-              {profile.politicalViews && (
-                <span className="rounded-full bg-zinc-100 px-2 py-0.5 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-300">
-                  {profile.politicalViews}
-                </span>
-              )}
-            </div>
-          )}
+          {!hideSensitiveDetails &&
+            (profile.ethnicity ||
+              profile.religion ||
+              profile.education ||
+              profile.politicalViews) && (
+              <div className="flex flex-wrap gap-1.5 text-xs">
+                {profile.ethnicity && (
+                  <span className="rounded-full bg-zinc-100 px-2 py-0.5 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-300">
+                    {profile.ethnicity}
+                  </span>
+                )}
+                {profile.religion && (
+                  <span className="rounded-full bg-zinc-100 px-2 py-0.5 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-300">
+                    {profile.religion}
+                  </span>
+                )}
+                {profile.education && (
+                  <span className="rounded-full bg-zinc-100 px-2 py-0.5 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-300">
+                    {profile.education}
+                  </span>
+                )}
+                {profile.politicalViews && (
+                  <span className="rounded-full bg-zinc-100 px-2 py-0.5 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-300">
+                    {profile.politicalViews}
+                  </span>
+                )}
+              </div>
+            )}
 
           <p className="text-sm leading-relaxed text-zinc-700 dark:text-zinc-300">
-            {profile.bio}
+            {hideSensitiveDetails
+              ? "Limited profile details are shown until access patterns normalize."
+              : profile.bio}
           </p>
 
           <div className="flex flex-wrap gap-1.5">
@@ -273,6 +282,10 @@ export function ProfilesChatCards({
   >({});
   const [hasSubmittedSwipeSummary, setHasSubmittedSwipeSummary] =
     useState(false);
+  const [profileViewCounts, setProfileViewCounts] = useState<
+    Record<string, number>
+  >({});
+  const [totalProfileOpenEvents, setTotalProfileOpenEvents] = useState(0);
   const [matchedProfile, setMatchedProfile] = useState<PartnerProfile | null>(
     null,
   );
@@ -371,6 +384,20 @@ export function ProfilesChatCards({
       document.body.style.overflow = originalOverflow;
     };
   }, [matchedProfile]);
+
+  useEffect(() => {
+    const activeProfile = profileSet.profiles[currentIndex];
+
+    if (!activeProfile) {
+      return;
+    }
+
+    setTotalProfileOpenEvents((count) => count + 1);
+    setProfileViewCounts((current) => ({
+      ...current,
+      [activeProfile.id]: (current[activeProfile.id] ?? 0) + 1,
+    }));
+  }, [currentIndex, profileSet.profiles]);
 
   const handleSaveMatch = async (profile: PartnerProfile) => {
     if (!documentId) {
@@ -580,6 +607,13 @@ export function ProfilesChatCards({
   const isSwipePhaseComplete =
     profileSet.profiles.length > 0 &&
     swipedCount === profileSet.profiles.length;
+  const activeProfile = profileSet.profiles[currentIndex];
+  const activeProfileViewCount = activeProfile
+    ? (profileViewCounts[activeProfile.id] ?? 0)
+    : 0;
+  const riskGuardrailTriggered =
+    totalProfileOpenEvents > MAX_PROFILE_OPEN_EVENTS ||
+    activeProfileViewCount > MAX_REPEAT_VIEWS_PER_PROFILE;
   const activeProfileDecision = profileSet.profiles[currentIndex]
     ? swipeDecisions[profileSet.profiles[currentIndex].id]
     : undefined;
@@ -591,6 +625,14 @@ export function ProfilesChatCards({
           Swipe through every match first. After all swipes, chat will ask why
           you made those choices and unlock full review navigation.
         </p>
+      )}
+
+      {riskGuardrailTriggered && (
+        <div className="mb-4 rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-xs text-amber-900 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-200">
+          Privacy guardrail active: repeated profile access can increase
+          re-identification risk. Sensitive fields are temporarily limited and
+          location remains coarse.
+        </div>
       )}
 
       {profileSet.preferencesSummary && (
@@ -675,6 +717,7 @@ export function ProfilesChatCards({
               }}
             >
               <ProfileCard
+                hideSensitiveDetails={riskGuardrailTriggered}
                 isSaved={savedProfileKeys.has(
                   `${documentId}:${profileSet.profiles[currentIndex].id}`,
                 )}

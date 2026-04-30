@@ -2,6 +2,7 @@ import { generateText, tool } from "ai";
 import type { Session } from "next-auth";
 import { z } from "zod";
 import { sanitizeCompatibilityText } from "@/lib/ai/content-guardrails";
+import { sanitizeProfileForPrivacy } from "@/lib/ai/content-guardrails";
 import {
   buildProfileGenerationPrompt,
   profileGenerationSystemPrompt,
@@ -210,7 +211,7 @@ export const generateProfiles = ({
                 profile.challengePoint ?? "",
                 "They bring a different perspective that could lead to interesting conversations and growth."
               ),
-            }));
+            })).map(sanitizeProfileForPrivacy);
 
             profilesJson = JSON.stringify(
               {

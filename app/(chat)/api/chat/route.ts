@@ -361,10 +361,12 @@ function buildMatchmakingRuntimeGuidance({
   uiMessages,
   canUseTools,
   forceGenerateProfiles,
+  canGenerateProfiles,
 }: {
   uiMessages: ChatMessage[];
   canUseTools: boolean;
   forceGenerateProfiles?: boolean;
+  canGenerateProfiles?: boolean;
 }) {
   const persistentUserProfile = buildPersistentUserProfile(uiMessages);
   const profileMemoryGuidance = `\n\nPersistent user profile memory (source of truth; keep this updated in your reasoning and do not discard known fields on regeneration):\n${JSON.stringify(
@@ -374,7 +376,12 @@ function buildMatchmakingRuntimeGuidance({
   )}\n\nRules for this memory:\n- Reuse known preferences from this object on every response.\n- Do not re-ask for fields that are already known unless the user asks to change them.\n- During regeneration, preserve known constraints and only adjust fields based on new feedback.\n- If new user input conflicts with existing values, prefer the newest explicit user statement and update the object.`;
 
   if (forceGenerateProfiles) {
-    return `\n\nRuntime conversation guidance:\n- The user just submitted their intake form. You now have their full preferences.\n- The generateProfiles tool is NOT available yet — you must complete Step 1 first.\n- Send your confirmation summary now: briefly restate what you heard, list the exact criteria, and ask "Does this look right? I'll find your matches once you give me the go-ahead."\n- Do NOT output JSON. Do NOT attempt to call any tool. Just send the confirmation message.${profileMemoryGuidance}`;
+    return `\n\nRuntime conversation guidance:\n- The user just submitted their intake form. You now have their full preferences.\n- Send your confirmation summary now: briefly restate what you heard, list the exact criteria, and ask "Does this look right? I'll find your matches once you give me the go-ahead."\n- Do NOT call any tool. Just send the confirmation message as plain text.`;
+  }
+
+  // User has confirmed their preferences — generate profiles immediately.
+  if (canGenerateProfiles) {
+    return `\n\nRuntime conversation guidance:\n- The user has confirmed their preferences and given you the go-ahead.\n- Call the generateProfiles tool RIGHT NOW. Do NOT send another confirmation message first.\n- Do NOT ask any more questions. Just call the tool.${profileMemoryGuidance}`;
   }
 
   const userTexts = getUserTextFromMessages(uiMessages);
@@ -583,6 +590,18 @@ export async function POST(request: Request) {
       .toLowerCase() ?? "";
     const userAffirmed = /\b(yes|yeah|yep|yup|ok|okay|sure|go ahead|generate|looks good|looks right|that'?s? right|correct|right|perfect|great|sounds good|do it|proceed|let'?s? go|confirmed?)\b/.test(latestUserText);
     const canGenerateProfiles = modelMessages.length >= 3 && botJustAskedForConfirmation && userAffirmed;
+    const profileGenerationAttempts = uiMessages.reduce((count, message) => {
+      if (message.role !== "assistant") {
+        return count;
+      }
+
+      const generatedInMessage = message.parts.some(
+        (part) => (part as { type?: string }).type === "tool-generateProfiles",
+      );
+
+      return generatedInMessage ? count + 1 : count;
+    }, 0);
+    const excessiveProfileGeneration = profileGenerationAttempts >= 6;
 
     const negativeFramingDetected = await classifyNegativeSelfPerception(latestUserText, getClassifierModel());
     if (negativeFramingDetected) {
@@ -591,12 +610,15 @@ export async function POST(request: Request) {
 
     const activeTools: ActiveToolName[] = isReasoningModel
       ? []
-      : canGenerateProfiles ? ["generateProfiles"] : [];
+      : !excessiveProfileGeneration && canGenerateProfiles
+        ? ["generateProfiles"]
+        : [];
 
     const runtimeGuidance = buildMatchmakingRuntimeGuidance({
       uiMessages,
       canUseTools: !isReasoningModel,
       forceGenerateProfiles,
+      canGenerateProfiles,
     });
     const maxStepCount = 5;
 
@@ -606,7 +628,7 @@ export async function POST(request: Request) {
         const result = streamText({
           model: getLanguageModel(resolvedChatModel),
           maxRetries: 0,
-          system: `${systemPrompt({ selectedChatModel: resolvedChatModel, requestHints })}${runtimeGuidance}${negativeFramingDetected ? "\n\nSAFETY OVERRIDE — act on this immediately: The user's latest message contains negative self-framing (e.g. expressing that they are unattractive, undesirable, or asking why no one would want them). Do NOT engage with, validate, or build on that framing. Do NOT call any tools. Respond with warmth and empathy: briefly acknowledge their feeling, firmly and kindly affirm that you are here to help them find a genuine connection, and redirect the conversation toward what they are looking for in a partner." : ""}`,
+          system: `${systemPrompt({ selectedChatModel: resolvedChatModel, requestHints })}${runtimeGuidance}${negativeFramingDetected ? "\n\nSAFETY OVERRIDE — act on this immediately: The user's latest message contains negative self-framing (e.g. expressing that they are unattractive, undesirable, or asking why no one would want them). Do NOT engage with, validate, or build on that framing. Do NOT call any tools. Respond with warmth and empathy: briefly acknowledge their feeling, firmly and kindly affirm that you are here to help them find a genuine connection, and redirect the conversation toward what they are looking for in a partner." : ""}${excessiveProfileGeneration ? "\n\nPRIVACY GUARDRAIL OVERRIDE — act on this immediately: This chat has reached the regeneration safety limit for profile access. Do NOT call any tools. Explain that profile regeneration is temporarily limited to protect against inference and re-identification risk. Ask the user to provide specific feedback they want applied, and continue with conversation-only refinement until the next session." : ""}`,
           messages: modelMessages,
           stopWhen: (opts) => stepCountIs(maxStepCount)(opts) || hasToolCall('generateProfiles')(opts),
           experimental_activeTools: activeTools,

@@ -136,6 +136,9 @@ export const profileGenerationSystemPrompt = `You are a creative writer speciali
 - **challengePoint** must describe a difference or growth opportunity in neutral, constructive terms — e.g., "They tend toward spontaneity while you prefer structure, which could spark interesting conversations." Never frame it as a user deficiency or something the user needs to "overcome about themselves."
 - Never use language such as: "despite your…", "even though you are…", "someone like you…", "for a person with your…", "you're lucky that…", or "this match could help you overcome your [trait]."
 - Treat the user as a capable, whole person seeking a genuine connection. All text must reflect that assumption.
+- Never include personally identifying or contact information in any field. Do not include exact addresses, apartment/building names, landmarks tied to a residence, phone numbers, email addresses, social handles, or exact coordinates.
+- Keep location coarse and non-identifying (e.g., "Brooklyn, NY" or "North Austin, TX"), never street-level.
+- Avoid behavioral surveillance language or details that could enable stalking (exact routines, exact gym/time/place combinations, commute patterns tied to identity).
 
 ## Output Format
 Output ONLY valid JSON. No markdown, no explanation, no code blocks. Use this EXACT structure:

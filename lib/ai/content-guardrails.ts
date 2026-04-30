@@ -1,4 +1,5 @@
 import { generateText } from "ai";
+import type { PartnerProfile } from "@/lib/ai/preference-schema";
 import type { getClassifierModel } from "@/lib/ai/providers";
 
 /**
@@ -124,4 +125,53 @@ export function sanitizeCompatibilityText(
     return fallback;
   }
   return text;
+}
+
+const EMAIL_PATTERN = /\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/gi;
+const PHONE_PATTERN = /\b(?:\+?\d{1,3}[\s.-]?)?(?:\(?\d{3}\)?[\s.-]?)\d{3}[\s.-]?\d{4}\b/g;
+const URL_PATTERN = /\bhttps?:\/\/[^\s]+\b/gi;
+const SOCIAL_HANDLE_PATTERN = /(^|\s)@[a-z0-9_]{2,30}\b/gi;
+const COORDINATE_PATTERN = /\b-?\d{1,2}\.\d{3,}\s*,\s*-?\d{1,3}\.\d{3,}\b/g;
+const STREET_ADDRESS_PATTERN = /\b\d{1,6}\s+[A-Za-z0-9.'\-\s]{2,}\s(?:street|st|avenue|ave|road|rd|boulevard|blvd|lane|ln|drive|dr|court|ct|way)\b/gi;
+
+export function redactSensitiveContactInfo(text: string): string {
+  return text
+    .replace(EMAIL_PATTERN, "[redacted]")
+    .replace(PHONE_PATTERN, "[redacted]")
+    .replace(URL_PATTERN, "[redacted]")
+    .replace(SOCIAL_HANDLE_PATTERN, " [redacted]")
+    .replace(COORDINATE_PATTERN, "[redacted]")
+    .replace(STREET_ADDRESS_PATTERN, "[redacted]")
+    .trim();
+}
+
+export function coarseLocation(location: string): string {
+  const raw = redactSensitiveContactInfo(location || "");
+
+  if (!raw) {
+    return "Area shared on match";
+  }
+
+  // Keep only coarse geography (usually city + state/country) and avoid street-level detail.
+  const segments = raw
+    .split(",")
+    .map((item) => item.trim())
+    .filter(Boolean);
+
+  if (segments.length >= 2) {
+    return `${segments[0]}, ${segments[1]}`;
+  }
+
+  return segments[0] ?? "Area shared on match";
+}
+
+export function sanitizeProfileForPrivacy(profile: PartnerProfile): PartnerProfile {
+  return {
+    ...profile,
+    location: coarseLocation(profile.location),
+    bio: redactSensitiveContactInfo(profile.bio),
+    occupation: redactSensitiveContactInfo(profile.occupation),
+    compatibilityNotes: redactSensitiveContactInfo(profile.compatibilityNotes),
+    challengePoint: redactSensitiveContactInfo(profile.challengePoint),
+  };
 }
