@@ -651,6 +651,37 @@ export async function getMessageCountByUserId({
   }
 }
 
+export async function getProfileDocumentCountByUserId({
+  userId,
+  windowMinutes,
+}: {
+  userId: string;
+  windowMinutes: number;
+}) {
+  try {
+    const windowStart = new Date(Date.now() - windowMinutes * 60 * 1000);
+
+    const [stats] = await db
+      .select({ count: count(document.id) })
+      .from(document)
+      .where(
+        and(
+          eq(document.userId, userId),
+          eq(document.kind, "profiles"),
+          gte(document.createdAt, windowStart)
+        )
+      )
+      .execute();
+
+    return stats?.count ?? 0;
+  } catch (_error) {
+    throw new ChatbotError(
+      "bad_request:database",
+      "Failed to get profile document count by user id"
+    );
+  }
+}
+
 export async function createStreamId({
   streamId,
   chatId,

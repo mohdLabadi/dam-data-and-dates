@@ -30,6 +30,7 @@ import {
   getChatById,
   getMessageCountByUserId,
   getMessagesByChatId,
+  getProfileDocumentCountByUserId,
   saveChat,
   saveMessages,
   updateChatTitleById,
@@ -490,6 +491,14 @@ export async function POST(request: Request) {
       return new ChatbotError("rate_limit:chat").toResponse();
     }
 
+    const hourlyProfileCount = hasDatabase
+      ? await getProfileDocumentCountByUserId({
+          userId: session.user.id,
+          windowMinutes: 60,
+        }).catch(() => 0)
+      : 0;
+    const hourlyProfileLimitReached = hourlyProfileCount >= 10;
+
     const incomingMessages = Array.isArray(messages)
       ? (messages as ChatMessage[])
       : undefined;
@@ -610,7 +619,7 @@ export async function POST(request: Request) {
 
     const activeTools: ActiveToolName[] = isReasoningModel
       ? []
-      : !excessiveProfileGeneration && canGenerateProfiles
+      : !excessiveProfileGeneration && !hourlyProfileLimitReached && canGenerateProfiles
         ? ["generateProfiles"]
         : [];
 
@@ -628,7 +637,7 @@ export async function POST(request: Request) {
         const result = streamText({
           model: getLanguageModel(resolvedChatModel),
           maxRetries: 0,
-          system: `${systemPrompt({ selectedChatModel: resolvedChatModel, requestHints })}${runtimeGuidance}${negativeFramingDetected ? "\n\nSAFETY OVERRIDE — act on this immediately: The user's latest message contains negative self-framing (e.g. expressing that they are unattractive, undesirable, or asking why no one would want them). Do NOT engage with, validate, or build on that framing. Do NOT call any tools. Respond with warmth and empathy: briefly acknowledge their feeling, firmly and kindly affirm that you are here to help them find a genuine connection, and redirect the conversation toward what they are looking for in a partner." : ""}${excessiveProfileGeneration ? "\n\nPRIVACY GUARDRAIL OVERRIDE — act on this immediately: This chat has reached the regeneration safety limit for profile access. Do NOT call any tools. Explain that profile regeneration is temporarily limited to protect against inference and re-identification risk. Ask the user to provide specific feedback they want applied, and continue with conversation-only refinement until the next session." : ""}`,
+          system: `${systemPrompt({ selectedChatModel: resolvedChatModel, requestHints })}${runtimeGuidance}${negativeFramingDetected ? "\n\nSAFETY OVERRIDE — act on this immediately: The user's latest message contains negative self-framing (e.g. expressing that they are unattractive, undesirable, or asking why no one would want them). Do NOT engage with, validate, or build on that framing. Do NOT call any tools. Respond with warmth and empathy: briefly acknowledge their feeling, firmly and kindly affirm that you are here to help them find a genuine connection, and redirect the conversation toward what they are looking for in a partner." : ""}${excessiveProfileGeneration ? "\n\nPRIVACY GUARDRAIL OVERRIDE — act on this immediately: This chat has reached the regeneration safety limit for profile access. Do NOT call any tools. Explain that profile regeneration is temporarily limited to protect against inference and re-identification risk. Ask the user to provide specific feedback they want applied, and continue with conversation-only refinement until the next session." : ""}${hourlyProfileLimitReached ? "\n\nRATE LIMIT OVERRIDE — act on this immediately: This user has reached the hourly profile generation limit (10 profile sets per hour). Do NOT call generateProfiles or updateDocument. Respond warmly: let them know that profile generation is temporarily paused to keep things fair and high-quality for everyone, and that they can come back in about an hour to generate new matches. Invite them to keep sharing what they're looking for in the meantime — you'll have even better results next time." : ""}`,
           messages: modelMessages,
           stopWhen: (opts) => stepCountIs(maxStepCount)(opts) || hasToolCall('generateProfiles')(opts),
           experimental_activeTools: activeTools,
