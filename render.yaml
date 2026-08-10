@@ -6,8 +6,8 @@ services:
     runtime: node
     plan: free
     region: oregon
-    buildCommand: corepack enable && pnpm install --frozen-lockfile && pnpm build
-    startCommand: pnpm start
+    buildCommand: npx pnpm@9.12.3 install --frozen-lockfile && npx pnpm@9.12.3 build
+    startCommand: npx pnpm@9.12.3 start
     healthCheckPath: /ping
     envVars:
       - key: NODE_VERSION

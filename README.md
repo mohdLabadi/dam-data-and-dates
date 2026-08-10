@@ -71,8 +71,8 @@ The repo includes a [`render.yaml`](render.yaml) Blueprint.
 | Setting | Value |
 |---------|--------|
 | Runtime | Node |
-| Build | `corepack enable && pnpm install --frozen-lockfile && pnpm build` |
-| Start | `pnpm start` |
+| Build | `npx pnpm@9.12.3 install --frozen-lockfile && npx pnpm@9.12.3 build` |
+| Start | `npx pnpm@9.12.3 start` |
 | Health check | `/ping` |
 
 Free-tier instances may spin down when idle; the first request after sleep can take ~30–60s.
