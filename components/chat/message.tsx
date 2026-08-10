@@ -1,0 +1,403 @@
+"use client";
+import type { UseChatHelpers } from "@ai-sdk/react";
+import { useState } from "react";
+import type { Vote } from "@/lib/db/schema";
+import type { PartnerProfile } from "@/lib/ai/preference-schema";
+import type { ChatMessage } from "@/lib/types";
+import { cn, sanitizeText } from "@/lib/utils";
+import { useDataStream } from "@/components/chat/data-stream-provider";
+import { DocumentToolResult } from "@/components/document";
+import { DocumentPreview } from "@/components/document-preview";
+import { MessageContent } from "@/components/elements/message";
+import { Response } from "@/components/elements/response";
+import {
+  Tool,
+  ToolContent,
+  ToolHeader,
+  ToolInput,
+  ToolOutput,
+} from "@/components/elements/tool";
+import { SparklesIcon } from "@/components/icons";
+import { MessageEditor } from "@/components/chat/message-editor";
+import { MessageReasoning } from "@/components/chat/message-reasoning";
+import { ProfilesChatCards } from "@/components/matchmaker/profiles-chat-cards";
+import { PreviewAttachment } from "@/components/chat/preview-attachment";
+
+const EMPTY_ASSISTANT_FALLBACK_TEXT =
+  "I couldn't generate a response for that request. Please try again.";
+
+const PurePreviewMessage = ({
+  addToolApprovalResponse,
+  chatId: _chatId,
+  message,
+  vote: _vote,
+  isLoading,
+  setMessages,
+  regenerate,
+  sendMessage,
+  isReadonly,
+  requiresScrollPadding: _requiresScrollPadding,
+}: {
+  addToolApprovalResponse: UseChatHelpers<ChatMessage>["addToolApprovalResponse"];
+  chatId: string;
+  message: ChatMessage;
+  vote: Vote | undefined;
+  isLoading: boolean;
+  setMessages: UseChatHelpers<ChatMessage>["setMessages"];
+  regenerate: UseChatHelpers<ChatMessage>["regenerate"];
+  sendMessage?: UseChatHelpers<ChatMessage>["sendMessage"];
+  isReadonly: boolean;
+  requiresScrollPadding: boolean;
+}) => {
+  const [mode, setMode] = useState<"view" | "edit">("view");
+
+  const attachmentsFromMessage = message.parts.filter(
+    (part) => part.type === "file",
+  );
+  const hasVisibleAssistantContent =
+    message.role === "assistant" &&
+    message.parts.some((part) => {
+      if (part.type === "text") {
+        return part.text?.trim().length > 0;
+      }
+
+      if (part.type === "reasoning") {
+        return part.text?.trim().length > 0;
+      }
+
+      return part.type.startsWith("tool-");
+    });
+
+  useDataStream();
+
+  return (
+    <div
+      className="group/message fade-in w-full animate-in duration-200"
+      data-role={message.role}
+      data-testid={`message-${message.role}`}
+    >
+      <div
+        className={cn("flex w-full items-start gap-2 md:gap-3", {
+          "justify-end": message.role === "user" && mode !== "edit",
+          "justify-start": message.role === "assistant",
+        })}
+      >
+        {message.role === "assistant" && (
+          <div className="-mt-1 flex size-8 shrink-0 items-center justify-center rounded-full bg-background ring-1 ring-border">
+            <SparklesIcon size={14} />
+          </div>
+        )}
+
+        <div
+          className={cn("flex flex-col", {
+            "gap-2 md:gap-4": message.parts?.some(
+              (p) => p.type === "text" && p.text?.trim(),
+            ),
+            "w-full":
+              (message.role === "assistant" &&
+                (message.parts?.some(
+                  (p) => p.type === "text" && p.text?.trim(),
+                ) ||
+                  message.parts?.some((p) => p.type.startsWith("tool-")))) ||
+              mode === "edit",
+            "max-w-[calc(100%-2.5rem)] sm:max-w-[min(fit-content,80%)]":
+              message.role === "user" && mode !== "edit",
+          })}
+        >
+          {attachmentsFromMessage.length > 0 && (
+            <div
+              className="flex flex-row justify-end gap-2"
+              data-testid={"message-attachments"}
+            >
+              {attachmentsFromMessage.map((attachment) => (
+                <PreviewAttachment
+                  attachment={{
+                    name: attachment.filename ?? "file",
+                    contentType: attachment.mediaType,
+                    url: attachment.url,
+                  }}
+                  key={attachment.url}
+                />
+              ))}
+            </div>
+          )}
+
+          {message.parts?.map((part, index) => {
+            if (!part || typeof part !== "object") {
+              return null;
+            }
+
+            const { type } = part;
+            const key = `message-${message.id}-part-${index}`;
+
+            if (type === "reasoning") {
+              const hasContent = part.text?.trim().length > 0;
+              const isStreaming =
+                "state" in part &&
+                (part as { state?: string }).state === "streaming";
+              if (hasContent || isStreaming) {
+                return (
+                  <MessageReasoning
+                    isLoading={isLoading || isStreaming}
+                    key={key}
+                    reasoning={part.text || ""}
+                  />
+                );
+              }
+            }
+
+            if (type === "text") {
+              if (mode === "view") {
+                return (
+                  <div key={key}>
+                    <MessageContent
+                      className={cn({
+                        "wrap-break-word w-fit rounded-2xl px-3 py-2 text-right text-[#ece7e6]":
+                          message.role === "user",
+                        "bg-transparent px-0 py-0 text-left":
+                          message.role === "assistant",
+                      })}
+                      data-testid="message-content"
+                      style={
+                        message.role === "user"
+                          ? { backgroundColor: "#550000" }
+                          : undefined
+                      }
+                    >
+                      <Response>
+                        {sanitizeText(
+                          message.role === "user"
+                            ? part.text.replace(
+                                /\s*Use updateDocument with id [a-f0-9-]+\.?/g,
+                                "",
+                              )
+                            : part.text,
+                        )}
+                      </Response>
+                    </MessageContent>
+                  </div>
+                );
+              }
+
+              if (mode === "edit") {
+                return (
+                  <div
+                    className="flex w-full flex-row items-start gap-3"
+                    key={key}
+                  >
+                    <div className="size-8" />
+                    <div className="min-w-0 flex-1">
+                      <MessageEditor
+                        key={message.id}
+                        message={message}
+                        regenerate={regenerate}
+                        setMessages={setMessages}
+                        setMode={setMode}
+                      />
+                    </div>
+                  </div>
+                );
+              }
+            }
+
+            if (type === "tool-generateProfiles") {
+              const { toolCallId, state } = part;
+
+              if (state !== "output-available") {
+                return (
+                  <div
+                    className="flex h-24 items-center justify-center"
+                    key={toolCallId}
+                  >
+                    <div className="text-center">
+                      <div className="mb-2 text-3xl">💘</div>
+                      <p className="text-sm text-muted-foreground">
+                        Crafting your matches...
+                      </p>
+                    </div>
+                  </div>
+                );
+              }
+
+              const rawOutput = (part as { output?: unknown }).output as
+                | {
+                    documentId?: string;
+                    profileSet?: {
+                      profiles?: PartnerProfile[];
+                      preferencesSummary?: string;
+                    };
+                    profiles?: PartnerProfile[];
+                    preferencesSummary?: string;
+                    message?: string;
+                  }
+                | undefined;
+
+              const profileSet =
+                rawOutput?.profileSet ??
+                (rawOutput?.profiles
+                  ? {
+                      profiles: rawOutput.profiles,
+                      preferencesSummary: rawOutput.preferencesSummary,
+                    }
+                  : null);
+
+              if (!profileSet?.profiles?.length) {
+                return (
+                  <div
+                    className="rounded-lg border border-dashed border-border p-4 text-sm text-muted-foreground"
+                    key={toolCallId}
+                  >
+                    Something went wrong generating your profiles. Please try again.
+                  </div>
+                );
+              }
+
+              return (
+                <div className="w-full" key={toolCallId}>
+                  <ProfilesChatCards
+                    documentId={rawOutput?.documentId}
+                    profileSet={{
+                      generatedAt: new Date().toISOString(),
+                      preferencesSummary: profileSet.preferencesSummary ?? "",
+                      profiles: profileSet.profiles,
+                    }}
+                    sendMessage={sendMessage}
+                  />
+                </div>
+              );
+            }
+
+            if (type === "tool-createDocument") {
+              const { toolCallId } = part;
+
+              if (part.output && "error" in part.output) {
+                return (
+                  <div
+                    className="rounded-lg border border-red-200 bg-red-50 p-4 text-red-500 dark:bg-red-950/50"
+                    key={toolCallId}
+                  >
+                    Error creating document: {String(part.output.error)}
+                  </div>
+                );
+              }
+
+              return (
+                <DocumentPreview
+                  isReadonly={isReadonly}
+                  key={toolCallId}
+                  result={part.output}
+                />
+              );
+            }
+
+            if (type === "tool-updateDocument") {
+              const { toolCallId } = part;
+
+              if (part.output && "error" in part.output) {
+                return (
+                  <div
+                    className="rounded-lg border border-red-200 bg-red-50 p-4 text-red-500 dark:bg-red-950/50"
+                    key={toolCallId}
+                  >
+                    Error updating document: {String(part.output.error)}
+                  </div>
+                );
+              }
+
+              return (
+                <div className="relative" key={toolCallId}>
+                  <DocumentPreview
+                    args={{ ...part.output, isUpdate: true }}
+                    isReadonly={isReadonly}
+                    result={part.output}
+                  />
+                </div>
+              );
+            }
+
+            if (type === "tool-requestSuggestions") {
+              const { toolCallId, state } = part;
+
+              return (
+                <Tool defaultOpen={true} key={toolCallId}>
+                  <ToolHeader state={state} type="tool-requestSuggestions" />
+                  <ToolContent>
+                    {state === "input-available" && (
+                      <ToolInput input={part.input} />
+                    )}
+                    {state === "output-available" && (
+                      <ToolOutput
+                        errorText={undefined}
+                        output={
+                          "error" in part.output ? (
+                            <div className="rounded border p-2 text-red-500">
+                              Error: {String(part.output.error)}
+                            </div>
+                          ) : (
+                            <DocumentToolResult
+                              isReadonly={isReadonly}
+                              result={part.output}
+                              type="request-suggestions"
+                            />
+                          )
+                        }
+                      />
+                    )}
+                  </ToolContent>
+                </Tool>
+              );
+            }
+
+            return null;
+          })}
+
+          {message.role === "assistant" &&
+            !isLoading &&
+            !hasVisibleAssistantContent && (
+              <div>
+                <MessageContent
+                  className="bg-transparent px-0 py-0 text-left"
+                  data-testid="message-content"
+                >
+                  <Response>{EMPTY_ASSISTANT_FALLBACK_TEXT}</Response>
+                </MessageContent>
+              </div>
+            )}
+
+          {/* Message actions (copy/like/dislike) removed for profile interface */}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export const PreviewMessage = PurePreviewMessage;
+
+export const ThinkingMessage = () => {
+  return (
+    <div
+      className="group/message fade-in w-full animate-in duration-300"
+      data-role="assistant"
+      data-testid="message-assistant-loading"
+    >
+      <div className="flex items-start justify-start gap-3">
+        <div className="-mt-1 flex size-8 shrink-0 items-center justify-center rounded-full bg-background ring-1 ring-border">
+          <div className="animate-pulse">
+            <SparklesIcon size={14} />
+          </div>
+        </div>
+
+        <div className="flex w-full flex-col gap-2 md:gap-4">
+          <div className="flex items-center gap-1 p-0 text-muted-foreground text-sm">
+            <span className="animate-pulse">Thinking</span>
+            <span className="inline-flex">
+              <span className="animate-bounce [animation-delay:0ms]">.</span>
+              <span className="animate-bounce [animation-delay:150ms]">.</span>
+              <span className="animate-bounce [animation-delay:300ms]">.</span>
+            </span>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};

@@ -14,7 +14,6 @@ import useSWR, { useSWRConfig } from "swr";
 import { useDebounceCallback, useWindowSize } from "usehooks-ts";
 import { codeArtifact } from "@/artifacts/code/client";
 import { imageArtifact } from "@/artifacts/image/client";
-import { profilesArtifact } from "@/artifacts/profiles/client";
 import { sheetArtifact } from "@/artifacts/sheet/client";
 import { textArtifact } from "@/artifacts/text/client";
 import { useArtifact } from "@/hooks/use-artifact";
@@ -24,19 +23,20 @@ import { fetcher } from "@/lib/utils";
 import { ArtifactActions } from "./artifact-actions";
 import { ArtifactCloseButton } from "./artifact-close-button";
 import { ArtifactMessages } from "./artifact-messages";
-import { MultimodalInput } from "./multimodal-input";
+import { MultimodalInput } from "@/components/chat/multimodal-input";
 import { Toolbar } from "./toolbar";
 import { VersionFooter } from "./version-footer";
-import type { VisibilityType } from "./visibility-selector";
+import type { VisibilityType } from "@/lib/chat/visibility";
 
 export const artifactDefinitions = [
   textArtifact,
   codeArtifact,
   imageArtifact,
   sheetArtifact,
-  profilesArtifact,
 ];
-export type ArtifactKind = (typeof artifactDefinitions)[number]["kind"];
+export type ArtifactKind =
+  | (typeof artifactDefinitions)[number]["kind"]
+  | "profiles";
 
 export type UIArtifact = {
   title: string;

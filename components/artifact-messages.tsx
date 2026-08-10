@@ -7,7 +7,7 @@ import { INTAKE_MESSAGE_PREFIX } from "@/lib/constants";
 import type { Vote } from "@/lib/db/schema";
 import type { ChatMessage } from "@/lib/types";
 import type { UIArtifact } from "./artifact";
-import { PreviewMessage, ThinkingMessage } from "./message";
+import { PreviewMessage, ThinkingMessage } from "@/components/chat/message";
 
 type ArtifactMessagesProps = {
   addToolApprovalResponse: UseChatHelpers<ChatMessage>["addToolApprovalResponse"];

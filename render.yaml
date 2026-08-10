@@ -1,0 +1,36 @@
+# Render Blueprint — Be My Cupid / DAM
+# Docs: https://render.com/docs/infrastructure-as-code
+services:
+  - type: web
+    name: be-my-cupid
+    runtime: node
+    plan: free
+    region: oregon
+    buildCommand: corepack enable && pnpm install --frozen-lockfile && pnpm build
+    startCommand: pnpm start
+    healthCheckPath: /ping
+    envVars:
+      - key: NODE_VERSION
+        value: "20.18.1"
+      - key: NODE_ENV
+        value: production
+      - key: AUTH_TRUST_HOST
+        value: "true"
+      # Set these in the Render dashboard (or Blueprint sync)
+      - key: GOOGLE_GENERATIVE_AI_API_KEY
+        sync: false
+      - key: AUTH_SECRET
+        generateValue: true
+      # Optional — paste your public Render URL after first deploy, e.g. https://be-my-cupid.onrender.com
+      - key: AUTH_URL
+        sync: false
+      # Optional — enables Postgres persistence (chat history, accounts, saved matches)
+      - key: POSTGRES_URL
+        sync: false
+      # Optional
+      - key: BLOB_READ_WRITE_TOKEN
+        sync: false
+      - key: REDIS_URL
+        sync: false
+      - key: NANO_BANANA_IMAGE_MODEL
+        sync: false
