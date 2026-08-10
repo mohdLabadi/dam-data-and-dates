@@ -1,27 +1,27 @@
 "use client";
 
-import { useRouter } from "next/navigation";
-import { memo, useState } from "react";
-import { useSession, signOut } from "next-auth/react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { signOut, useSession } from "next-auth/react";
+import { memo, useState } from "react";
 import { Button } from "@/components/ui/button";
-import type { PartnerProfile } from "@/lib/ai/preference-schema";
-import { ProfileCard } from "./profiles-chat-cards";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { PlusIcon } from "./icons";
-import { guestRegex } from "@/lib/constants";
-import type { VisibilityType } from "./visibility-selector";
 import {
   Tooltip,
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import type { PartnerProfile } from "@/lib/ai/preference-schema";
+import { isGuestEmail } from "@/lib/constants";
+import { PlusIcon } from "./icons";
+import { ProfileCard } from "./profiles-chat-cards";
+import type { VisibilityType } from "./visibility-selector";
 
 type SavedMatchRecord = {
   id: string;
@@ -41,7 +41,10 @@ function PureChatHeader({
 }) {
   const router = useRouter();
   const { data: session } = useSession();
-  const isGuest = !session?.user || guestRegex.test(session.user.email ?? "");
+  const isGuest =
+    !session?.user ||
+    session.user.type === "guest" ||
+    isGuestEmail(session.user.email);
   const [isSavedMatchesOpen, setIsSavedMatchesOpen] = useState(false);
   const [savedMatches, setSavedMatches] = useState<SavedMatchRecord[]>([]);
   const [isSavedLoading, setIsSavedLoading] = useState(false);
@@ -65,20 +68,27 @@ function PureChatHeader({
         // Heal stale localStorage entries (e.g. photos stripped by old code)
         if (typeof window !== "undefined") {
           try {
-            window.localStorage.setItem("dam-saved-matches", JSON.stringify(matches));
-          } catch {}
+            window.localStorage.setItem(
+              "dam-saved-matches",
+              JSON.stringify(matches)
+            );
+          } catch {
+            // Ignore quota / private-mode storage errors
+          }
         }
       } else {
-        const raw = typeof window !== "undefined"
-          ? window.localStorage.getItem("dam-saved-matches")
-          : null;
+        const raw =
+          typeof window === "undefined"
+            ? null
+            : window.localStorage.getItem("dam-saved-matches");
         const local = raw ? (JSON.parse(raw) as SavedMatchRecord[]) : [];
         setSavedMatches(Array.isArray(local) ? local : []);
       }
     } catch {
-      const raw = typeof window !== "undefined"
-        ? window.localStorage.getItem("dam-saved-matches")
-        : null;
+      const raw =
+        typeof window === "undefined"
+          ? null
+          : window.localStorage.getItem("dam-saved-matches");
       const local = raw ? (JSON.parse(raw) as SavedMatchRecord[]) : [];
       setSavedMatches(Array.isArray(local) ? local : []);
     } finally {
@@ -96,15 +106,19 @@ function PureChatHeader({
         const local = raw ? (JSON.parse(raw) as SavedMatchRecord[]) : [];
         window.localStorage.setItem(
           "dam-saved-matches",
-          JSON.stringify(local.filter((m) => m.id !== id)),
+          JSON.stringify(local.filter((m) => m.id !== id))
         );
-      } catch {}
+      } catch {
+        // Ignore quota / private-mode storage errors
+      }
     }
 
     // Also attempt server delete
     try {
       await fetch(`/api/matches?id=${id}`, { method: "DELETE" });
-    } catch {}
+    } catch {
+      // Offline / no-DB — localStorage already updated
+    }
 
     setSavedMatches((current) => current.filter((match) => match.id !== id));
     setRemovingId(null);
@@ -157,7 +171,7 @@ function PureChatHeader({
 
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="sm" className="h-8 max-w-40 truncate">
+            <Button className="h-8 max-w-40 truncate" size="sm" variant="ghost">
               {accountLabel}
             </Button>
           </DropdownMenuTrigger>

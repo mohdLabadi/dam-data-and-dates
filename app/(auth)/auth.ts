@@ -72,10 +72,10 @@ export const {
       id: "guest",
       credentials: {},
       async authorize() {
-        const timestamp = Date.now();
+        const id = crypto.randomUUID();
         const localGuest = {
-          id: `guest-${timestamp}`,
-          email: `guest-${timestamp}@local.dev`,
+          id,
+          email: `guest-${id}`,
           type: "guest" as const,
         };
 

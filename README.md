@@ -1,67 +1,69 @@
-<a href="https://chat.vercel.ai/">
-  <img alt="Next.js 14 and App Router-ready Chatbot." src="app/(chat)/opengraph-image.png">
-  <h1 align="center">Chatbot</h1>
-</a>
+# Be My Cupid (DAM)
 
-<p align="center">
-    Chatbot (formerly AI Chatbot) is a free, open-source template built with Next.js and the AI SDK that helps you quickly build powerful chatbot applications.
-</p>
+An AI dating matchmaker built with Next.js and the Vercel AI SDK. DAM walks you through a short preference intake, then generates partner profiles you can swipe through and save.
 
-<p align="center">
-  <a href="https://chatbot.dev"><strong>Read Docs</strong></a> ·
-  <a href="#features"><strong>Features</strong></a> ·
-  <a href="#model-providers"><strong>Model Providers</strong></a> ·
-  <a href="#deploy-your-own"><strong>Deploy Your Own</strong></a> ·
-  <a href="#running-locally"><strong>Running locally</strong></a>
-</p>
-<br/>
+Originally a college project; maintained as a portfolio showcase.
 
 ## Features
 
-- [Next.js](https://nextjs.org) App Router
-  - Advanced routing for seamless navigation and performance
-  - React Server Components (RSCs) and Server Actions for server-side rendering and increased performance
-- [AI SDK](https://ai-sdk.dev/docs/introduction)
-  - Unified API for generating text, structured objects, and tool calls with LLMs
-  - Hooks for building dynamic chat and generative user interfaces
-  - Supports xAI (default), OpenAI, Fireworks, and other model providers
-- [shadcn/ui](https://ui.shadcn.com)
-  - Styling with [Tailwind CSS](https://tailwindcss.com)
-  - Component primitives from [Radix UI](https://radix-ui.com) for accessibility and flexibility
-- Data Persistence
-  - [Neon Serverless Postgres](https://vercel.com/marketplace/neon) for saving chat history and user data
-  - [Vercel Blob](https://vercel.com/storage/blob) for efficient file storage
-- [Auth.js](https://authjs.dev)
-  - Simple and secure authentication
+- Conversational intake form + chat refinement
+- AI-generated partner profiles (close / stretch / exploratory matches)
+- Optional AI headshots
+- In-chat swipe UI to save or pass matches
+- Hybrid persistence: works with guest + `localStorage`, or Postgres when configured
+- Google Gemini via the AI SDK
 
-## Model Providers
+## Stack
 
-This template is configured to use Google models via the [AI SDK Google provider](https://ai-sdk.dev/providers/ai-sdk-providers/google-generative-ai).
+- Next.js (App Router) + React 19
+- AI SDK + `@ai-sdk/google`
+- Auth.js (credentials + guest)
+- Drizzle ORM + Postgres (optional)
+- Tailwind CSS / shadcn-style UI
 
-### Google API Key
+## Environment
 
-Set `GOOGLE_GENERATIVE_AI_API_KEY` in your `.env.local` file.
+Copy [`.env.example`](.env.example) to `.env.local` and fill in values:
 
-## Deploy Your Own
+| Variable | Required | Purpose |
+|----------|----------|---------|
+| `GOOGLE_GENERATIVE_AI_API_KEY` | Yes | Gemini text + image |
+| `AUTH_SECRET` | Yes | Auth.js session cookies |
+| `POSTGRES_URL` | No | Chat history, users, saved matches |
+| `BLOB_READ_WRITE_TOKEN` | No | File / photo uploads via Vercel Blob |
+| `REDIS_URL` | No | Resumable chat streams |
+| `NANO_BANANA_IMAGE_MODEL` | No | Override image model id |
 
-You can deploy your own version of Chatbot to Vercel with one click:
+Without `POSTGRES_URL`, the app still runs: guests are created locally and saved matches fall back to `localStorage`.
 
-[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/templates/next.js/chatbot)
+Generate an auth secret if needed:
+
+```bash
+openssl rand -base64 32
+```
 
 ## Running locally
 
-You will need to use the environment variables [defined in `.env.example`](.env.example) to run Chatbot. It's recommended you use [Vercel Environment Variables](https://vercel.com/docs/projects/environment-variables) for this, but a `.env` file is all that is necessary.
-
-> Note: You should not commit your `.env` file or it will expose secrets that will allow others to control access to your various AI and authentication provider accounts.
-
-1. Install Vercel CLI: `npm i -g vercel`
-2. Link local instance with Vercel and GitHub accounts (creates `.vercel` directory): `vercel link`
-3. Download your environment variables: `vercel env pull`
-
 ```bash
 pnpm install
-pnpm db:migrate # Setup database or apply latest database changes
+pnpm db:migrate   # only needed when POSTGRES_URL is set
 pnpm dev
 ```
 
-Your app template should now be running on [localhost:3000](http://localhost:3000).
+Open [http://localhost:3000](http://localhost:3000). Unauthenticated visitors are signed in as guests automatically.
+
+## Scripts
+
+| Command | Description |
+|---------|-------------|
+| `pnpm dev` | Dev server (Turbopack) |
+| `pnpm build` | Migrate (if DB configured) + production build |
+| `pnpm start` | Start production server |
+| `pnpm lint` | Lint with Ultracite |
+| `pnpm test` | Playwright e2e |
+| `pnpm db:studio` | Drizzle Studio |
+
+## Notes
+
+- Matchmaking prompts live primarily in `lib/ai/prompts.ts` — treat them as intentional product work.
+- Some unused Vercel chatbot template modules remain in the tree; they are not part of the dating flow.

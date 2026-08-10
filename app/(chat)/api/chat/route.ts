@@ -602,7 +602,7 @@ export async function POST(request: Request) {
           system: `${systemPrompt({ selectedChatModel: resolvedChatModel, requestHints })}${runtimeGuidance}`,
           messages: modelMessages,
           stopWhen: (opts) => stepCountIs(maxStepCount)(opts) || hasToolCall('generateProfiles')(opts),
-          experimental_activeTools: activeTools,
+          activeTools,
           providerOptions: isReasoningModel
             ? {
                 anthropic: {

@@ -12,6 +12,7 @@ import {
   type Dispatch,
   memo,
   type ReactNode,
+  type RefObject,
   type SetStateAction,
   useEffect,
   useRef,
@@ -76,11 +77,11 @@ const Tool = ({
       return;
     }
 
-    if (selectedTool !== description) {
-      setSelectedTool(description);
-    } else {
+    if (selectedTool === description) {
       setSelectedTool(null);
       onClick({ sendMessage });
+    } else {
+      setSelectedTool(description);
     }
   };
 
@@ -192,7 +193,7 @@ const ReadingLevelSelector = ({
                 {
                   "bg-primary text-primary-foreground": currentLevel !== 2,
                   "bg-background text-foreground": currentLevel === 2,
-                },
+                }
               )}
               drag="y"
               dragConstraints={{ top: -dragConstraints, bottom: 0 }}
@@ -319,12 +320,14 @@ const PureToolbar = ({
   artifactKind: ArtifactKind;
 }) => {
   const toolbarRef = useRef<HTMLDivElement>(null);
-  const timeoutRef = useRef<ReturnType<typeof setTimeout>>();
+  const timeoutRef = useRef<ReturnType<typeof setTimeout> | undefined>(
+    undefined
+  );
 
   const [selectedTool, setSelectedTool] = useState<string | null>(null);
   const [isAnimating, setIsAnimating] = useState(false);
 
-  useOnClickOutside(toolbarRef, () => {
+  useOnClickOutside(toolbarRef as RefObject<HTMLElement>, () => {
     setIsToolbarVisible(false);
     setSelectedTool(null);
   });
@@ -361,7 +364,7 @@ const PureToolbar = ({
   }, [status, setIsToolbarVisible]);
 
   const artifactDefinition = artifactDefinitions.find(
-    (definition) => definition.kind === artifactKind,
+    (definition) => definition.kind === artifactKind
   );
 
   if (!artifactDefinition) {

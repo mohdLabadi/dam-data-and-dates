@@ -42,3 +42,9 @@ yarn-error.log*
 /playwright-report/
 /blob-report/
 /playwright/*
+
+# Local Python smoke tests / venv
+venv/
+.venv/
+Python API test/*.png
+Python API test/__pycache__/

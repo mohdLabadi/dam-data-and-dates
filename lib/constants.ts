@@ -3,7 +3,12 @@ import { generateDummyPassword } from "./db/utils";
 export const isProductionEnvironment = process.env.NODE_ENV === "production";
 export const isDevelopmentEnvironment = process.env.NODE_ENV === "development";
 
-export const guestRegex = /^guest-\d+$/;
+/** Matches DB guests (`guest-<timestamp>`) and local fallbacks (`guest-<id>@…`). */
+export const guestRegex = /^guest-[^@]+(@.*)?$/;
+
+export function isGuestEmail(email: string | null | undefined): boolean {
+  return guestRegex.test(email ?? "");
+}
 
 export const INTAKE_MESSAGE_PREFIX = "__INTAKE_FORM__::";
 
