@@ -1,6 +1,6 @@
 "use client";
 
-import { X } from "lucide-react";
+import { Sparkles, Timer, WandSparkles, X } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -111,14 +111,16 @@ const normalizeTag = (value: string) =>
 
 const labelByValue = (
   value: string,
-  options: Array<{ value: string; label: string }>,
+  options: Array<{ value: string; label: string }>
 ) => {
   return options.find((option) => option.value === value)?.label ?? value;
 };
 
-function buildIntakePrompt(values: IntakeValues) {
+function buildIntakePrompt(values: IntakeValues, isTestMode = false) {
   const lines = [
-    "I completed your dating intake form. Please generate my first set of matches now.",
+    isTestMode
+      ? "I am using test mode with fictional placeholder values. Please generate a demo set of profiles only; do not treat these details as real preferences."
+      : "I completed your dating intake form. Please generate my first set of matches now.",
     `Name: ${truncate(values.firstName, 80) || "Not provided"}`,
     `My age: ${truncate(values.age, 3) || "Not provided"}`,
     `Age range preference: ${values.preferredAgeMin && values.preferredAgeMax ? `${truncate(values.preferredAgeMin, 3)}-${truncate(values.preferredAgeMax, 3)}` : "Open"}`,
@@ -139,6 +141,25 @@ function buildIntakePrompt(values: IntakeValues) {
 
   return lines.join("\n").slice(0, 1900);
 }
+
+const testValues: IntakeValues = {
+  firstName: "Jordan",
+  age: "29",
+  preferredAgeMin: "27",
+  preferredAgeMax: "36",
+  location: "New York, NY",
+  maxDistanceMiles: "25",
+  religionPreference: "open",
+  relationshipGoal: "serious",
+  interestedIn: "all-genders",
+  smokingPreference: "prefer_non_smoker",
+  drinkingPreference: "social_ok",
+  hobbies: ["Reading", "Trying new restaurants", "Weekend hikes"],
+  partnerQualities: ["Kind", "Curious", "Emotionally available"],
+  values: ["Growth", "Honesty"],
+  dealbreakers: ["Dishonesty"],
+  lifestyle: "Fictional sample preferences for a product demonstration.",
+};
 
 function TagInput({
   id,
@@ -205,7 +226,9 @@ function TagInput({
             const next = event.target.value;
             if (next.includes(",")) {
               const chunks = next.split(",");
-              chunks.slice(0, -1).forEach((chunk) => pushTag(chunk));
+              for (const chunk of chunks.slice(0, -1)) {
+                pushTag(chunk);
+              }
               setValue(chunks.at(-1) ?? "");
               return;
             }
@@ -237,7 +260,36 @@ function TagInput({
   );
 }
 
-function WelcomeScreen({ onAcknowledge }: { onAcknowledge: () => void }) {
+function PrivacyPolicy() {
+  return (
+    <footer className="mt-5 border-t pt-4 text-xs leading-relaxed text-muted-foreground">
+      <p className="font-semibold text-foreground">Strict privacy policy</p>
+      <p className="mt-1">
+        Enter only information you are comfortable sharing. We use your intake
+        answers, chat messages, and feedback to provide this service and send
+        them to our AI provider to generate fictional profiles. Do not submit
+        another person&apos;s sensitive or identifying information. We do not
+        sell your personal information. Test-mode values are fictional and must
+        not be used to make real-world decisions. By continuing, you acknowledge
+        this is an experimental AI service and that generated profiles are not
+        real people or professional advice.
+      </p>
+    </footer>
+  );
+}
+
+function WelcomeScreen({
+  onAcknowledge,
+  onStartTest,
+  isSubmitting,
+}: {
+  onAcknowledge: () => void;
+  onStartTest: () => void;
+  isSubmitting: boolean;
+}) {
+  const [showTestConfirmation, setShowTestConfirmation] = useState(false);
+  const [acknowledgesTestMode, setAcknowledgesTestMode] = useState(false);
+
   return (
     <div className="mx-auto w-full max-w-2xl px-3 pb-6 pt-4 md:px-4">
       <Card className="overflow-hidden border-border/80">
@@ -301,22 +353,87 @@ function WelcomeScreen({ onAcknowledge }: { onAcknowledge: () => void }) {
               </p>
             </div>
 
-            <div className="rounded-lg border border-border bg-muted/30 p-3 text-xs">
-              <span className="font-medium text-foreground">
-                Privacy note:{" "}
-              </span>
-              This app runs without a database. Your preferences and saved
-              matches are stored only in your browser&apos;s local storage and
-              are never sent to a server beyond what&apos;s needed to generate
-              your profiles.
+            <div className="overflow-hidden rounded-xl border border-primary/25 bg-gradient-to-br from-primary/10 via-background to-background">
+              <div className="flex flex-col gap-4 p-4 sm:flex-row sm:items-center sm:justify-between">
+                <div className="flex gap-3">
+                  <div className="flex size-10 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground">
+                    <WandSparkles className="size-5" />
+                  </div>
+                  <div>
+                    <p className="font-semibold text-foreground">
+                      In a hurry? See the magic first.
+                    </p>
+                    <p className="mt-0.5 text-sm text-muted-foreground">
+                      We&apos;ll introduce a fictional dater and create a sample
+                      set of matches — no form required.
+                    </p>
+                    <div className="mt-2 flex items-center gap-1.5 text-xs font-medium text-primary">
+                      <Timer className="size-3.5" />A 30-second product tour
+                    </div>
+                  </div>
+                </div>
+                {!showTestConfirmation && (
+                  <Button
+                    className="shrink-0"
+                    onClick={() => setShowTestConfirmation(true)}
+                    type="button"
+                    variant="secondary"
+                  >
+                    <Sparkles />
+                    Show me a demo
+                  </Button>
+                )}
+              </div>
+
+              {showTestConfirmation && (
+                <div className="border-t border-primary/20 bg-background/80 p-4">
+                  <p className="font-semibold text-foreground">
+                    One quick reality check
+                  </p>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    The name, preferences, and profiles in this tour are
+                    fictional. This is a preview of DAM, not a real matching
+                    session.
+                  </p>
+                  <label className="mt-3 flex cursor-pointer items-start gap-2 text-sm text-foreground">
+                    <input
+                      checked={acknowledgesTestMode}
+                      className="mt-0.5 size-4 accent-primary"
+                      onChange={(event) =>
+                        setAcknowledgesTestMode(event.target.checked)
+                      }
+                      type="checkbox"
+                    />
+                    <span>I understand this is a fictional product demo.</span>
+                  </label>
+                  <div className="mt-4 flex flex-wrap gap-2">
+                    <Button
+                      disabled={!acknowledgesTestMode || isSubmitting}
+                      onClick={onStartTest}
+                      type="button"
+                    >
+                      <Sparkles />
+                      Start the fictional demo
+                    </Button>
+                    <Button
+                      onClick={() => setShowTestConfirmation(false)}
+                      type="button"
+                      variant="ghost"
+                    >
+                      Not now
+                    </Button>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
 
-          <div className="mt-6 flex justify-end">
-            <Button onClick={onAcknowledge} type="button" className="px-6">
-              I understand — let&apos;s begin
+          <div className="mt-6 flex flex-wrap justify-end gap-2">
+            <Button className="px-6" onClick={onAcknowledge} type="button">
+              I&apos;ll create my own profile
             </Button>
           </div>
+          <PrivacyPolicy />
         </CardContent>
       </Card>
     </div>
@@ -345,23 +462,29 @@ export function IntakeForm({
 
     return Boolean(
       values.firstName.trim().length >= 2 &&
-      Number.isFinite(age) &&
-      age >= 18 &&
-      age <= 99 &&
-      Number.isFinite(preferredAgeMin) &&
-      Number.isFinite(preferredAgeMax) &&
-      preferredAgeMin >= 18 &&
-      preferredAgeMax <= 99 &&
-      preferredAgeMin <= preferredAgeMax &&
-      values.relationshipGoal &&
-      values.interestedIn &&
-      values.hobbies.length > 0 &&
-      values.partnerQualities.length > 0,
+        Number.isFinite(age) &&
+        age >= 18 &&
+        age <= 99 &&
+        Number.isFinite(preferredAgeMin) &&
+        Number.isFinite(preferredAgeMax) &&
+        preferredAgeMin >= 18 &&
+        preferredAgeMax <= 99 &&
+        preferredAgeMin <= preferredAgeMax &&
+        values.relationshipGoal &&
+        values.interestedIn &&
+        values.hobbies.length > 0 &&
+        values.partnerQualities.length > 0
     );
   }, [values]);
 
   if (isMounted && step === "welcome") {
-    return <WelcomeScreen onAcknowledge={() => setStep("form")} />;
+    return (
+      <WelcomeScreen
+        isSubmitting={isSubmitting}
+        onAcknowledge={() => setStep("form")}
+        onStartTest={() => onSubmit(buildIntakePrompt(testValues, true))}
+      />
+    );
   }
 
   if (!isMounted) {
@@ -643,9 +766,9 @@ export function IntakeForm({
 
             <div className="md:col-span-2">
               <TagInput
+                description="What you want in the other person."
                 id="partnerQualities"
                 label="Top partner qualities *"
-                description="What you want in the other person."
                 onChange={(next) =>
                   setValues((prev) => ({ ...prev, partnerQualities: next }))
                 }
@@ -656,9 +779,9 @@ export function IntakeForm({
 
             <div className="md:col-span-2">
               <TagInput
+                description="What matters to you fundamentally."
                 id="values"
                 label="Core values"
-                description="What matters to you fundamentally."
                 onChange={(next) =>
                   setValues((prev) => ({ ...prev, values: next }))
                 }
@@ -708,6 +831,7 @@ export function IntakeForm({
           </form>
         </CardContent>
       </Card>
+      <PrivacyPolicy />
     </div>
   );
 }
